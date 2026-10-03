@@ -1,449 +1,525 @@
-import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Settings2, X, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Focus, Minus, Plus, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, vibrate, playBeep } from '../lib/utils';
+import { cn, vibrate } from '../lib/utils';
 import { saveSession } from '../lib/stats';
+import { useCountdown, useWakeLock } from '../hooks/useTimer';
+import { useViewport } from '../hooks/useViewport';
+import { useSettings, updateSettings } from '../lib/settings';
+import { FlipRow, FlipText, Board } from '../components/Flip';
+import { RotaryDial } from '../components/RotaryDial';
+import { KeyButton } from '../components/KeyButton';
+import { stationChime, secondTick, flapLand } from '../lib/sound';
 
-interface TimerViewProps {
-  presetMinutes?: number;
-  presetName?: string;
-  onFocusModeChange?: (isFocus: boolean) => void;
+const QUICK = [5, 10, 15, 25, 30, 45, 60, 90];
+
+function fmt(totalSec: number) {
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange }: TimerViewProps) {
-  const [timeLeft, setTimeLeft] = useState(presetMinutes * 60);
-  const [isActive, setIsActive] = useState(false);
-  const [totalTime, setTotalTime] = useState(presetMinutes * 60);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isAfk, setIsAfk] = useState(false);
-  const [showCustomModal, setShowCustomModal] = useState(false);
-  const [customMinutes, setCustomMinutes] = useState(25);
-  const [currentPresetName, setCurrentPresetName] = useState<string | undefined>(presetName);
-  const [showCelebration, setShowCelebration] = useState(false);
+export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange }: {
+  presetMinutes?: number;
+  presetName?: string;
+  onFocusModeChange?: (f: boolean) => void;
+}) {
+  const cd = useCountdown();
+  const settings = useSettings();
+  const vp = useViewport();
 
-  // AFK Detection
+  const [setMinutes, setSetMinutes] = useState(presetMinutes);
+  const [label, setLabel] = useState<string | undefined>(presetName);
+  const [intent, setIntent] = useState('');
+  const [thenBreak, setThenBreak] = useState(0);
+  const [isBreak, setIsBreak] = useState(false);
+  const [focus, setFocus] = useState(false);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customMin, setCustomMin] = useState(25);
+  const [done, setDone] = useState<null | 'focus' | 'break'>(null);
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hasTime = cd.totalMs > 0;
+  const running = cd.running;
+  const atTop = !running && !done && cd.remainingMs === cd.totalMs; // set-but-not-started → show the dial
+
+  useWakeLock(running || focus);
+
+  /* ---------- preset plumbing from Presets view ---------- */
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
-    const resetAfk = () => {
-      setIsAfk(false);
-      onFocusModeChange?.(false);
-      clearTimeout(timeout);
-      if (isActive) {
-        timeout = setTimeout(() => {
-          setIsAfk(true);
-          onFocusModeChange?.(true);
-        }, 10000); // 10 seconds AFK
-      }
-    };
-
-    window.addEventListener('mousemove', resetAfk);
-    window.addEventListener('keydown', resetAfk);
-    window.addEventListener('touchstart', resetAfk);
-    resetAfk();
-
-    return () => {
-      window.removeEventListener('mousemove', resetAfk);
-      window.removeEventListener('keydown', resetAfk);
-      window.removeEventListener('touchstart', resetAfk);
-      clearTimeout(timeout);
-    };
-  }, [isActive]);
-
-  useEffect(() => {
-    setTotalTime(presetMinutes * 60);
-    setTimeLeft(presetMinutes * 60);
-    setIsActive(false);
-    setCurrentPresetName(presetName);
+    setSetMinutes(presetMinutes);
+    setLabel(presetName);
+    setIsBreak(false);
+    setDone(null);
+    cd.reset(presetMinutes * 60000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetMinutes, presetName]);
 
+  /* ---------- title bar ---------- */
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((time) => time - 1);
-      }, 1000);
-    } else if (isActive && timeLeft === 0) {
-      setIsActive(false);
-      setShowCelebration(true);
-      vibrate([100, 100, 100, 100, 300]); // Completion haptic pattern
-      if (soundEnabled) {
-        playBeep(880, 200, 0.2);
-        setTimeout(() => playBeep(880, 200, 0.2), 300);
-        setTimeout(() => playBeep(1108.73, 400, 0.2), 600);
-      }
-      
-      // Save session
-      saveSession({
-        duration: totalTime,
-        type: totalTime >= 15 * 60 ? 'focus' : 'break'
-      });
+    if (running) document.title = `${fmt(cd.secondsLeft)} — ${isBreak ? 'Break' : (label || 'Focus')}`;
+    else document.title = 'Platform — Time Instruments';
+    return () => { document.title = 'Platform — Time Instruments'; };
+  }, [running, cd.secondsLeft, label, isBreak]);
+
+  /* ---------- per-second tick ---------- */
+  const lastSec = useRef(0);
+  useEffect(() => {
+    if (running && cd.secondsLeft !== lastSec.current) {
+      lastSec.current = cd.secondsLeft;
+      if (cd.secondsLeft <= 3 && cd.secondsLeft > 0) flapLand(0.12); // final beats hit harder
+      else secondTick();
     }
-    return () => {
-      if (interval) clearInterval(interval);
+  }, [cd.secondsLeft, running]);
+
+  /* ---------- AFK → focus mode ---------- */
+  const enterFocus = (v: boolean) => { setFocus(v); onFocusModeChange?.(v); };
+  useEffect(() => {
+    const wake = () => {
+      enterFocus(false);
+      if (idle.current) clearTimeout(idle.current);
+      if (running) idle.current = setTimeout(() => enterFocus(true), 12000);
     };
-  }, [isActive, timeLeft, soundEnabled]);
+    const opts: AddEventListenerOptions = { passive: true };
+    window.addEventListener('mousemove', wake, opts);
+    window.addEventListener('keydown', wake, opts);
+    window.addEventListener('pointerdown', wake, opts);
+    window.addEventListener('wheel', wake, opts);
+    wake();
+    return () => {
+      ['mousemove', 'keydown', 'pointerdown', 'wheel'].forEach(e => window.removeEventListener(e, wake));
+      if (idle.current) clearTimeout(idle.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
 
-  const toggleTimer = () => {
-    vibrate(isActive ? 40 : 60);
-    setIsActive(!isActive);
+  /* ---------- keyboard ---------- */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.code === 'Space') { e.preventDefault(); toggle(); }
+      else if (e.key === 'r' || e.key === 'R') resetTimer();
+      else if (e.key === 'f' || e.key === 'F') running && enterFocus(true);
+      else if (e.key === 'Escape') { enterFocus(false); setCustomOpen(false); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
+  const completeFocus = () => {
+    vibrate([120, 80, 120, 80, 300]);
+    stationChime();
+    saveSession({ duration: cd.totalMs / 1000, type: isBreak ? 'break' : 'focus', label: intent || undefined, preset: label });
+    if (!isBreak && thenBreak > 0) {
+      setDone('focus');
+      setTimeout(() => {
+        setDone(null);
+        setIsBreak(true);
+        cd.start(thenBreak * 60000, completeBreak);
+      }, 2600);
+    } else {
+      setDone(isBreak ? 'break' : 'focus');
+    }
   };
+  const completeBreak = () => {
+    vibrate([80, 60, 80]);
+    stationChime();
+    saveSession({ duration: thenBreak * 60, type: 'break', label: 'Recess' });
+    setDone('break');
+  };
+
+  const toggle = () => {
+    vibrate(running ? 35 : 55);
+    if (running) cd.pause();
+    else if (hasTime && cd.remainingMs > 0) cd.resume(isBreak ? completeBreak : completeFocus);
+    else cd.start(setMinutes * 60000, completeFocus);
+  };
+
   const resetTimer = () => {
-    vibrate([30, 50, 30]);
-    setIsActive(false);
-    setTimeLeft(totalTime);
+    vibrate([25, 40, 25]);
+    cd.reset(setMinutes * 60000);
+    setIsBreak(false);
+    setDone(null);
   };
 
-  const setPreset = (minutes: number) => {
-    vibrate(40);
-    setIsActive(false);
-    setTotalTime(minutes * 60);
-    setTimeLeft(minutes * 60);
-    setCurrentPresetName(undefined);
+  const applyMinutes = (m: number) => {
+    setSetMinutes(m);
+    setLabel(undefined);
+    if (!running) { cd.reset(m * 60000); setIsBreak(false); setDone(null); }
   };
 
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  const secLabel = (secs: number) => {
+    if (isBreak) return 'Recess';
+    if (label) return label;
+    const m = secs / 60;
+    if (m <= 5) return 'Short Recess';
+    if (m <= 15) return 'Long Recess';
+    if (m <= 25) return 'Deep Work';
+    return 'Extended Focus';
   };
 
-  const getSessionLabel = (seconds: number) => {
-    if (currentPresetName) return currentPresetName;
-    const minutes = seconds / 60;
-    if (minutes <= 5) return "Short Break";
-    if (minutes <= 15) return "Long Break";
-    if (minutes <= 25) return "Deep Work Session";
-    return "Extended Focus";
-  };
+  const dispSec = hasTime ? cd.secondsLeft : setMinutes * 60;
+  const dispStr = fmt(dispSec);
+  const flipSize = Math.max(64, Math.min(150, Math.round(vp.w / (dispStr.length === 5 ? 7.2 : 8))));
 
-  const progress = ((totalTime - timeLeft) / totalTime) * 100;
-  const radius = 140;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-
+  /* ======================= RENDER ======================= */
   return (
-    <div className="flex flex-col items-center justify-center px-6 relative flex-1">
-      <AnimatePresence>
-        {isAfk ? (
-          <motion.div 
-            key="afk-mode"
-            layout
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: "easeInOut" }}
-            className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background overflow-hidden"
-          >
-            {/* Subtle background pulse */}
-            <motion.div 
-              animate={{ opacity: [0.05, 0.15, 0.05] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none"
-            />
-            
-            <div className="flex flex-col items-center z-10 w-full px-8 md:px-24">
-              <motion.span 
-                layoutId="timer-text"
-                className="font-digital text-[24vw] md:text-[20vw] font-bold tracking-tighter text-on-surface timer-glow leading-none"
-              >
-                {formatTime(timeLeft)}
-              </motion.span>
-              
-              <motion.div 
-                initial={{ width: 0, opacity: 0 }}
-                animate={{ width: "100%", opacity: 1 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-                className="w-full max-w-5xl h-1 md:h-2 bg-surface-container-highest rounded-full mt-12 md:mt-16 overflow-hidden"
-              >
-                <motion.div 
-                  className="h-full bg-primary transition-all duration-1000 ease-linear"
-                  style={{ width: `${progress}%` }}
-                />
-              </motion.div>
+    <div className="flex-1 w-full flex flex-col items-center justify-center px-4 md:px-8 py-6 relative">
+      {/* ---------- MAIN LAYOUT ---------- */}
+      <section className="w-full max-w-6xl flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 lg:gap-14">
 
-              <motion.span 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 0.5, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="font-label text-xs md:text-sm uppercase tracking-[0.5em] text-secondary mt-8 md:mt-12 font-medium animate-pulse"
-              >
-                Deep Focus Mode Active
-              </motion.span>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div 
-            key="normal-mode"
-            layout
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full flex flex-col items-center"
+        {/* THE BOARD */}
+        <motion.div layout className="w-full max-w-2xl">
+          <Board
+            screws
+            label={isBreak ? 'RECESS' : secLabel(dispSec)}
+            right={
+              <div className="flex items-center gap-3">
+                {running && (
+                  <span className="flex items-center gap-1.5">
+                    <motion.i
+                      animate={{ opacity: [1, 0.15, 1] }}
+                      transition={{ duration: 1.6, repeat: Infinity }}
+                      className="block w-2 h-2 rounded-full bg-signal not-italic"
+                      style={{ background: 'var(--color-signal)' }}
+                    />
+                    <span className="engraved text-[10px] md:text-xs" style={{ color: 'var(--color-signal-bright)' }}>On time</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => updateSettings({ sound: !settings.sound })}
+                  className="text-flap-dim hover:text-flap-ink transition-colors"
+                  title={settings.sound ? 'Sound on' : 'Sound off'}
+                >
+                  {settings.sound ? <Volume2 size={15} /> : <VolumeX size={15} />}
+                </button>
+              </div>
+            }
           >
-            {/* Background Decorative Element */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] overflow-hidden">
-              <span className="font-digital text-[30rem] font-bold leading-none select-none">
-                {Math.floor(totalTime / 60)}
+            <div className="flex items-center justify-center py-2">
+              <FlipRow text={dispStr} size={flipSize} live={running} accent={isBreak} />
+            </div>
+            {/* progress tape along the board floor */}
+            <div className="mt-4 h-[3px] rounded-full" style={{ background: 'rgba(242,233,207,0.08)' }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: 'var(--color-signal-bright)', width: `${(hasTime ? cd.progress : 0) * 100}%` }}
+                transition={{ duration: 0.15, ease: 'linear' }}
+              />
+            </div>
+            <div className="mt-3 flex justify-between items-baseline px-0.5">
+              <span className="engraved text-[9px] md:text-[10px]">
+                {intent ? intent.toUpperCase() : 'PLATFORM TIMEKEEPING'}
+              </span>
+              <span className="engraved text-[9px] md:text-[10px]">
+                {hasTime ? `${Math.round(cd.progress * 100)}% ELAPSED` : `SET FOR ${fmt(setMinutes * 60)}`}
               </span>
             </div>
+          </Board>
 
-            <section className="w-full max-w-md md:max-w-4xl flex flex-col md:flex-row items-center justify-center gap-12 lg:gap-24 relative z-10 mt-8 md:mt-0 md:h-[calc(100vh-4rem)]">
-              {/* Timer Display Container */}
-              <div className="relative flex items-center justify-center shrink-0 w-full md:w-auto">
-                {/* Desktop Circular Progress (hidden on mobile) */}
-                <div className="hidden md:flex relative w-[300px] h-[300px] lg:w-[400px] lg:h-[400px] items-center justify-center">
-                  {/* Outer Glow Ring */}
-                  <div className="absolute inset-0 rounded-full border-2 border-outline-variant opacity-20"></div>
-                  
-                  {/* Active Progress Ring (SVG) */}
-                  <svg className="absolute inset-0 w-full h-full -rotate-90 transform" viewBox="0 0 300 300">
-                    <circle
-                      className="text-primary drop-shadow-[0_0_8px_var(--color-primary)] transition-all duration-1000 ease-linear"
-                      cx="150"
-                      cy="150"
-                      fill="none"
-                      r={120}
-                      stroke="currentColor"
-                      strokeDasharray={2 * Math.PI * 120}
-                      strokeDashoffset={(2 * Math.PI * 120) - (progress / 100) * (2 * Math.PI * 120)}
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                    />
-                  </svg>
+          {/* transport */}
+          <div className="mt-8 flex items-center justify-center gap-5">
+            <KeyButton onClick={resetTimer} title="Reset (R)" className="w-16 h-16 !rounded-full" haptic={0}>
+              <RotateCcw size={22} />
+            </KeyButton>
+            <KeyButton
+              onClick={toggle}
+              variant="signal"
+              className="w-24 h-24 !rounded-full"
+              title="Start / Pause (Space)"
+            >
+              {running ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" className="ml-1.5" />}
+            </KeyButton>
+            <KeyButton
+              onClick={() => enterFocus(!focus)}
+              disabled={!running && !focus}
+              title="Focus mode (F)"
+              className="w-16 h-16 !rounded-full"
+            >
+              <Focus size={22} />
+            </KeyButton>
+          </div>
+          <div className="mt-4 flex items-center justify-center gap-6 label-wall text-[10px]">
+            <span>Space — run/pause</span><span>R — reset</span><span>F — focus</span>
+          </div>
+        </motion.div>
+
+        {/* RIGHT RAIL */}
+        <div className="w-full max-w-sm flex flex-col gap-7">
+          <AnimatePresence mode="wait">
+            {atTop ? (
+              <motion.div
+                key="set"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.25 }}
+                className="flex flex-col items-center gap-6"
+              >
+                <RotaryDial minutes={setMinutes} onChange={applyMinutes} size={250} disabled={running}>
+                  <div className="flex flex-col items-center">
+                    <FlipRow text={fmt(setMinutes * 60)} size={46} sound={false} />
+                    <span className="label-wall text-[9px] mt-1">Turn to set</span>
+                  </div>
+                </RotaryDial>
+
+                <div className="flex flex-wrap justify-center gap-2">
+                  {QUICK.map(m => (
+                    <button
+                      key={m}
+                      onClick={() => { flapLand(0.05); applyMinutes(m); }}
+                      className={cn('chip px-3 py-1.5 text-[11px]', setMinutes === m && !label && 'chip--on')}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                  <button onClick={() => setCustomOpen(true)} className="chip px-3 py-1.5 text-[11px]">Other</button>
                 </div>
 
-                {/* Shared Timer Text Component */}
-                <div className={cn(
-                  "flex flex-col items-center",
-                  "md:absolute md:inset-0 md:justify-center"
-                )}>
-                  <motion.span 
-                    layoutId="timer-text"
-                    className="font-digital text-7xl md:text-[6rem] lg:text-[8rem] font-bold tracking-tighter text-on-surface timer-glow leading-none"
-                  >
-                    {formatTime(timeLeft)}
-                  </motion.span>
-                  <span className="font-label text-xs uppercase tracking-[0.2em] text-secondary mt-2 font-medium">
-                    {getSessionLabel(totalTime)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div className="w-full flex flex-col items-center gap-10 md:items-start md:max-w-sm">
-                <div className="flex items-center gap-8 md:gap-6">
-                  {/* Reset */}
-                  <button 
-                    onClick={resetTimer}
-                    className="w-14 h-14 rounded-full flex items-center justify-center bg-surface-container-highest text-on-surface-variant hover:text-on-surface transition-all active:scale-90"
-                  >
-                    <RotateCcw size={24} />
-                  </button>
-                  
-                  {/* Play/Pause Primary CTA */}
-                  <button 
-                    onClick={toggleTimer}
-                    className="w-24 h-24 rounded-full flex items-center justify-center bg-primary text-on-primary-container glow-primary hover:scale-105 active:scale-95 transition-all"
-                  >
-                    {isActive ? (
-                      <Pause size={40} fill="currentColor" />
-                    ) : (
-                      <Play size={40} fill="currentColor" className="ml-2" />
-                    )}
-                  </button>
-                  
-                  {/* Sound Toggle */}
-                  <button 
-                    onClick={() => { vibrate(20); setSoundEnabled(!soundEnabled); }}
-                    className={cn(
-                      "w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-90",
-                      soundEnabled ? "bg-surface-container-highest text-on-surface" : "bg-surface-container-low text-on-surface-variant border border-white/5"
-                    )}
-                  >
-                    {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} />}
-                  </button>
+                <div className="w-full">
+                  <input
+                    value={intent}
+                    onChange={e => setIntent(e.target.value)}
+                    placeholder="Working on… (optional)"
+                    className="w-full bg-transparent border-b border-rule px-1 py-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:border-ink transition-colors font-body"
+                  />
                 </div>
 
-                {/* Presets Quick Selection */}
-                <div className="w-full max-w-md">
-                  <div className="flex flex-wrap justify-center md:justify-start gap-2 px-2 md:px-0">
-                    {Array.from({ length: 12 }, (_, i) => (i + 1) * 5).map((mins) => (
-                      <button 
-                        key={mins}
-                        onClick={() => setPreset(mins)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-full border text-[10px] md:text-xs font-label uppercase tracking-widest transition-all whitespace-nowrap",
-                          totalTime === mins * 60 && !currentPresetName
-                            ? "bg-primary/10 border-primary/30 text-primary" 
-                            : "glass-panel border-outline-variant/20 text-on-surface-variant hover:text-primary hover:border-primary/40"
-                        )}
+                <div className="w-full flex items-center justify-between">
+                  <span className="label-wall text-[10px]">Then break</span>
+                  <div className="flex gap-1.5">
+                    {[0, 5, 15].map(b => (
+                      <button
+                        key={b}
+                        onClick={() => { vibrate(15); setThenBreak(b); }}
+                        className={cn('chip px-2.5 py-1 text-[10px]', thenBreak === b && 'chip--on')}
                       >
-                        {mins}m
+                        {b === 0 ? 'Off' : `${b}m`}
                       </button>
                     ))}
-                    <button 
-                      onClick={() => { vibrate(20); setShowCustomModal(true); }}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full border text-[10px] md:text-xs font-label uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-1.5",
-                        ![5,10,15,20,25,30,35,40,45,50,55,60].includes(totalTime / 60) && !currentPresetName
-                          ? "bg-primary/10 border-primary/30 text-primary" 
-                          : "glass-panel border-outline-variant/20 text-on-surface-variant hover:text-primary hover:border-primary/40"
-                      )}
-                    >
-                      <Settings2 size={12} /> Custom
-                    </button>
                   </div>
                 </div>
-              </div>
-            </section>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="run"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.25 }}
+                className="panel-wall p-6 flex flex-col gap-5"
+              >
+                <div>
+                  <div className="label-wall text-[10px] mb-1">Session</div>
+                  <div className="font-display text-2xl font-bold text-ink leading-none uppercase">{secLabel(dispSec)}</div>
+                  {intent && <div className="text-sm text-ink-soft mt-1 font-body">{intent}</div>}
+                </div>
+                <hr className="rule-h" />
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink-soft font-body">Elapsed</span>
+                  <span className="font-display font-semibold text-ink">{fmt(Math.floor((cd.totalMs - cd.remainingMs) / 1000))}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-ink-soft font-body">Set for</span>
+                  <span className="font-display font-semibold text-ink">{fmt(Math.round(cd.totalMs / 1000))}</span>
+                </div>
+                {thenBreak > 0 && !isBreak && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ink-soft font-body">After this</span>
+                    <span className="font-display font-semibold text-ink">{thenBreak}m recess</span>
+                  </div>
+                )}
+                {isBreak && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-ink-soft font-body">Phase</span>
+                    <span className="font-display font-semibold" style={{ color: 'var(--color-signal)' }}>Recess</span>
+                  </div>
+                )}
+                <hr className="rule-h" />
+                <p className="text-[11px] text-ink-faint font-body leading-relaxed">
+                  Step away and the board takes over — focus mode fills the screen after 12 seconds idle.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </section>
 
-      {/* Custom Time Modal */}
+      {/* ---------- FOCUS MODE ---------- */}
       <AnimatePresence>
-        {showCustomModal && (
+        {focus && (
           <motion.div
+            key="focus"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+            transition={{ duration: 0.7, ease: [0.32, 0.72, 0, 1] }}
+            className="fixed inset-0 z-[200] flex flex-col items-center justify-center"
+            style={{ background: 'linear-gradient(180deg, #16130B 0%, #0F0C06 100%)' }}
           >
+            {/* slow ambient breathing */}
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-surface-container-low border border-white/10 p-6 rounded-2xl w-full max-w-sm relative"
+              animate={{ opacity: [0.05, 0.14, 0.05] }}
+              transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: 'radial-gradient(60% 45% at 50% 42%, var(--color-signal), transparent 70%)', opacity: 0.08 }}
+            />
+            <motion.div
+              initial={{ scale: 0.94, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.96, y: 20 }}
+              transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+              className="w-full px-6 flex flex-col items-center"
             >
-              <button 
-                onClick={() => setShowCustomModal(false)}
-                className="absolute top-4 right-4 text-on-surface-variant hover:text-on-surface"
+              <FlipRow
+                text={dispStr}
+                size={Math.min(220, Math.round(vp.w / (dispStr.length === 5 ? 6.4 : 7.2)))}
+                live={running}
+                accent={isBreak}
+              />
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.4, duration: 0.8, ease: [0.32, 0.72, 0, 1] }}
+                className="w-full max-w-4xl mt-12 md:mt-16 h-[3px] origin-left"
+                style={{ background: 'rgba(242,233,207,0.12)' }}
               >
-                <X size={20} />
-              </button>
-              <h3 className="font-headline text-xl font-bold text-on-surface mb-6">Custom Time</h3>
-              
-              <div className="flex flex-col items-center gap-6 mb-8">
-                <div className="text-5xl font-digital font-bold text-primary">
-                  {customMinutes} <span className="text-xl text-on-surface-variant">min</span>
-                </div>
-                <input 
-                  type="range" 
-                  min="1" 
-                  max="120" 
-                  value={customMinutes}
-                  onChange={(e) => setCustomMinutes(parseInt(e.target.value))}
-                  className="w-full accent-primary"
-                />
-              </div>
-
-              <button
-                onClick={() => {
-                  setPreset(customMinutes);
-                  setShowCustomModal(false);
-                }}
-                className="w-full py-3 rounded-xl bg-primary text-on-primary-container font-bold font-label uppercase tracking-wider hover:opacity-90 transition-opacity"
+                <div className="h-full origin-left" style={{ background: 'var(--color-signal-bright)', transform: `scaleX(${hasTime ? cd.progress : 0})`, transition: 'transform 0.2s linear' }} />
+              </motion.div>
+              <motion.span
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.55 }}
+                transition={{ delay: 0.7 }}
+                className="engraved text-xs md:text-sm mt-8"
+                style={{ letterSpacing: '0.5em' }}
               >
-                Set Timer
-              </button>
+                {isBreak ? 'RECESS' : 'BOARD ACTIVE — FOCUS'}
+              </motion.span>
+              {intent && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.35 }}
+                  transition={{ delay: 0.9 }}
+                  className="engraved text-[10px] mt-3"
+                >
+                  {intent.toUpperCase()}
+                </motion.span>
+              )}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Celebration Modal */}
+      {/* ---------- CUSTOM DURATION ---------- */}
       <AnimatePresence>
-        {showCelebration && (
+        {customOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[300] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md overflow-hidden"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+            style={{ background: 'rgba(15,12,6,0.7)', backdropFilter: 'blur(6px)' }}
+            onClick={() => setCustomOpen(false)}
           >
-            {/* Particles */}
-            {Array.from({ length: 50 }).map((_, i) => (
+            <motion.div
+              initial={{ y: 40, scale: 0.96 }} animate={{ y: 0, scale: 1 }} exit={{ y: 30, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+              className="board board-screws p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-5">
+                <span className="engraved text-xs">Set duration</span>
+                <button onClick={() => setCustomOpen(false)} className="text-flap-dim hover:text-flap-ink"><X size={18} /></button>
+              </div>
+              <div className="flex items-center justify-center gap-4 mb-6">
+                <KeyButton className="w-11 h-11 !rounded-lg" onClick={() => setCustomMin(m => Math.max(1, m - 1))}><Minus size={16} /></KeyButton>
+                <FlipRow text={String(customMin).padStart(2, '0')} size={64} sound={false} />
+                <span className="engraved text-xs">MIN</span>
+                <KeyButton className="w-11 h-11 !rounded-lg" onClick={() => setCustomMin(m => Math.min(180, m + 1))}><Plus size={16} /></KeyButton>
+              </div>
+              <input
+                type="range" min={1} max={180} value={customMin}
+                onChange={e => setCustomMin(parseInt(e.target.value))}
+                className="rng w-full mb-6"
+              />
+              <KeyButton variant="signal" className="w-full py-3.5 text-sm" onClick={() => { applyMinutes(customMin); setCustomOpen(false); }}>
+                Set timer
+              </KeyButton>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---------- COMPLETION TAKEOVER ---------- */}
+      <AnimatePresence>
+        {done && (
+          <motion.div
+            key="done"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+            className="fixed inset-0 z-[300] flex flex-col items-center justify-center overflow-hidden"
+            style={{ background: 'linear-gradient(180deg, #16130B 0%, #0F0C06 100%)' }}
+          >
+            {/* punched-ticket confetti */}
+            {Array.from({ length: 40 }).map((_, i) => (
               <motion.div
                 key={i}
-                initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
-                animate={{ 
-                  x: (Math.random() - 0.5) * (typeof window !== 'undefined' ? window.innerWidth : 1000) * 0.8, 
-                  y: (Math.random() - 0.5) * (typeof window !== 'undefined' ? window.innerHeight : 800) * 0.8,
-                  scale: Math.random() * 1.5 + 0.5,
-                  opacity: 0,
+                initial={{ x: 0, y: '-10vh', rotate: 0, opacity: 1 }}
+                animate={{
+                  x: (Math.random() - 0.5) * vp.w * 0.9,
+                  y: vp.h * (0.55 + Math.random() * 0.5),
+                  rotate: (Math.random() - 0.5) * 720,
+                  opacity: [1, 1, 0],
                 }}
-                transition={{ 
-                  duration: Math.random() * 2 + 1, 
-                  ease: "easeOut",
-                  delay: Math.random() * 0.2
-                }}
-                className="absolute w-3 h-3 rounded-full md:w-4 md:h-4 pointer-events-none"
+                transition={{ duration: 1.6 + Math.random() * 1.4, delay: Math.random() * 0.4, ease: [0.15, 0.6, 0.4, 1] }}
+                className="absolute top-1/4 w-2.5 h-4 pointer-events-none"
                 style={{
-                  backgroundColor: `hsl(${Math.random() * 360}, 80%, 60%)`,
-                  boxShadow: `0 0 10px hsl(${Math.random() * 360}, 80%, 60%)`
+                  left: '50%',
+                  background: i % 5 === 0 ? 'var(--color-signal-bright)' : i % 3 === 0 ? 'var(--color-brass-hi)' : '#D9CFB2',
+                  borderRadius: 1.5,
+                  boxShadow: '0 0 0 1px rgba(15,12,6,0.4)',
                 }}
               />
             ))}
 
             <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", bounce: 0.5, duration: 1.2 }}
-              className="text-primary drop-shadow-[0_0_60px_var(--color-primary)] mb-8 z-10"
+              initial={{ scale: 0.9, y: 24 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 160, damping: 18, delay: 0.15 }}
+              className="flex flex-col items-center gap-10 z-10 px-6"
             >
-              <Sparkles size={120} className="fill-transparent stroke-[1.5]" />
+              <FlipText text={done === 'break' ? 'RECESS OVER' : 'SESSION COMPLETE'} size={Math.min(72, vp.w / 16)} accent={false} />
+              <motion.p
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 0.6, y: 0 }}
+                transition={{ delay: 0.9 }}
+                className="engraved text-sm md:text-base text-center"
+                style={{ letterSpacing: '0.4em' }}
+              >
+                {done === 'break' ? 'BOARD READY — NEXT DEPARTURE AWAITS' : thenBreak > 0 ? `RECESS ${thenBreak}M BOARDING` : 'TIME WELL KEPT'}
+              </motion.p>
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.1 }}
+                className="flex gap-4"
+              >
+                <KeyButton variant="signal" className="px-10 py-4 text-sm" onClick={() => { setDone(null); resetTimer(); }}>
+                  Continue
+                </KeyButton>
+              </motion.div>
             </motion.div>
-            
-            <motion.h2
-              initial={{ y: 50, opacity: 0, scale: 0.8 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, type: "spring", bounce: 0.5 }}
-              className="font-headline text-5xl md:text-7xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary via-white to-primary bg-300% animate-gradient mb-4 timer-glow text-center z-10"
-              style={{ backgroundSize: '200% auto', animation: 'pulse 3s linear infinite' }}
-            >
-              Session Complete!
-            </motion.h2>
-            
-            <motion.p
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="text-on-surface-variant text-xl md:text-2xl mb-12 font-medium tracking-wide z-10"
-            >
-              Great work staying focused.
-            </motion.p>
-            
-            <motion.button
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              whileHover={{ scale: 1.05, boxShadow: "0 0 30px var(--color-primary)" }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ delay: 0.7 }}
-              onClick={() => {
-                vibrate(40);
-                setShowCelebration(false);
-                resetTimer();
-              }}
-              className="px-12 py-4 rounded-full bg-primary text-on-primary-container font-label uppercase tracking-[0.2em] font-bold text-lg glow-primary hover:bg-primary/90 transition-all z-10"
-            >
-              Continue
-            </motion.button>
 
-            {/* Background Animated Rings */}
-            <motion.div
-              animate={{ scale: [1, 3, 5], opacity: [0.8, 0, 0] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
-              className="absolute inset-0 m-auto w-48 h-48 rounded-full border-4 border-primary/40 pointer-events-none"
-            />
-            <motion.div
-              animate={{ scale: [1, 2, 4], opacity: [0.5, 0, 0] }}
-              transition={{ duration: 2.5, delay: 0.4, repeat: Infinity, ease: "easeOut" }}
-              className="absolute inset-0 m-auto w-48 h-48 rounded-full border-4 border-primary/30 pointer-events-none"
-            />
-            <motion.div
-              animate={{ scale: [1, 1.5, 3], opacity: [0.3, 0, 0] }}
-              transition={{ duration: 2.5, delay: 0.8, repeat: Infinity, ease: "easeOut" }}
-              className="absolute inset-0 m-auto w-48 h-48 rounded-full border-4 border-primary/20 pointer-events-none"
-            />
+            {/* expanding rings */}
+            {[0, 0.35, 0.7].map((d, i) => (
+              <motion.div
+                key={i}
+                animate={{ scale: [1, 2.6], opacity: [0.35, 0] }}
+                transition={{ duration: 2.2, delay: d, repeat: Infinity, ease: 'easeOut' }}
+                className="absolute w-56 h-56 rounded-full border-2 pointer-events-none"
+                style={{ borderColor: 'var(--color-signal)' }}
+              />
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
