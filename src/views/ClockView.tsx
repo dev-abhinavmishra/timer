@@ -175,6 +175,7 @@ export default function ClockView() {
                 </div>
               </div>
               <input
+                name="alarm-label"
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
                 placeholder="Label — e.g. Standup"

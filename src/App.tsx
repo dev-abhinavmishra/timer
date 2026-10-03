@@ -80,7 +80,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* ---------- content ---------- */}
-      <main className={cn('flex-1 flex flex-col w-full relative', !focusMode && 'pb-32')}>
+      <main className={cn('flex-1 flex flex-col w-full relative', !focusMode && 'pb-44')}>
         <AnimatePresence mode="wait">
           <motion.div
             key={view}

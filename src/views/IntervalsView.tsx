@@ -34,6 +34,12 @@ function loadRoutines(): Routine[] {
 function fmtDur(s: number) {
   return s >= 60 ? `${Math.round(s / 60)}m` : `${s}s`;
 }
+function fmtKept(s: number) {
+  return s >= 90 ? `${Math.round(s / 60)} MIN KEPT` : `${s} SEC KEPT`;
+}
+function fmtTotal(s: number) {
+  return s >= 60 ? `${Math.round(s / 60)} min total` : `${s}s total`;
+}
 function fmt(totalSec: number) {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
@@ -150,7 +156,7 @@ export default function IntervalsView() {
           >
             <FlipText text="ROUTE COMPLETE" size={Math.min(64, vp.w / 15)} />
             <div className="engraved text-sm" style={{ letterSpacing: '0.4em' }}>
-              {run.routine?.name.toUpperCase()} — {routineTotal(run.routine!) / 60} MIN KEPT
+              {run.routine?.name.toUpperCase()} — {fmtKept(routineTotal(run.routine!))}
             </div>
             <KeyButton variant="signal" className="px-10 py-4 text-sm" onClick={run.quit}>Done</KeyButton>
           </motion.div>
@@ -255,7 +261,7 @@ export default function IntervalsView() {
               </button>
             )}
             <div className="font-display text-2xl font-bold text-ink uppercase leading-none mb-1">{r.name}</div>
-            <div className="label-wall text-[9px] mb-4">{r.rounds} round{r.rounds > 1 ? 's' : ''} — {Math.round(routineTotal(r) / 60)} min total</div>
+            <div className="label-wall text-[9px] mb-4">{r.rounds} round{r.rounds > 1 ? 's' : ''} — {fmtTotal(routineTotal(r))}</div>
             <div className="flex flex-wrap gap-1.5 mb-5">
               {r.phases.map((p, j) => (
                 <span key={j} className={cn('chip px-2 py-1 text-[9px] cursor-default', p.kind === 'rest' && 'opacity-70')}>
@@ -305,6 +311,7 @@ export default function IntervalsView() {
               </div>
 
               <input
+                name="route-name"
                 value={name} onChange={e => setName(e.target.value)}
                 placeholder="Route name — e.g. Kettlebell ladder"
                 className="w-full mb-5 bg-[#0F0C06] border border-[rgba(242,233,207,0.12)] rounded-lg px-4 py-2.5 text-sm text-flap-ink placeholder:text-flap-dim focus:outline-none focus:border-[rgba(242,233,207,0.3)] font-body"
@@ -315,6 +322,7 @@ export default function IntervalsView() {
                 {phases.map((p, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input
+                      name={`phase-name-${i}`}
                       value={p.name}
                       onChange={e => setPhases(phases.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
                       className="flex-1 min-w-0 bg-[#0F0C06] border border-[rgba(242,233,207,0.12)] rounded-lg px-3 py-2 text-sm text-flap-ink focus:outline-none font-body"

@@ -85,7 +85,10 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     window.addEventListener('keydown', wake, opts);
     window.addEventListener('pointerdown', wake, opts);
     window.addEventListener('wheel', wake, opts);
-    wake();
+    // Arm the AFK timer on (re)run, but don't exit focus here — that only
+    // happens on real user input (running flips mid-takeover otherwise).
+    if (idle.current) clearTimeout(idle.current);
+    if (running) idle.current = setTimeout(() => enterFocus(true), 12000);
     return () => {
       ['mousemove', 'keydown', 'pointerdown', 'wheel'].forEach(e => window.removeEventListener(e, wake));
       if (idle.current) clearTimeout(idle.current);
@@ -280,6 +283,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
 
                 <div className="w-full">
                   <input
+                    name="timer-intent"
                     value={intent}
                     onChange={e => setIntent(e.target.value)}
                     placeholder="Working on… (optional)"
@@ -438,6 +442,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
                 <KeyButton className="w-11 h-11 !rounded-lg" onClick={() => setCustomMin(m => Math.min(180, m + 1))}><Plus size={16} /></KeyButton>
               </div>
               <input
+                name="custom-minutes"
                 type="range" min={1} max={180} value={customMin}
                 onChange={e => setCustomMin(parseInt(e.target.value))}
                 className="rng w-full mb-6"

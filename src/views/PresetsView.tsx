@@ -195,16 +195,18 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
 
               <div className="space-y-4 mb-6">
                 <input
+                  name="preset-name"
                   value={newName} onChange={e => setNewName(e.target.value)}
                   placeholder="Name — e.g. Guitar practice"
                   className="w-full bg-[#0F0C06] border border-[rgba(242,233,207,0.12)] rounded-lg px-4 py-2.5 text-sm text-flap-ink placeholder:text-flap-dim focus:outline-none font-body"
                 />
                 <div>
                   <div className="engraved text-[10px] mb-2">Duration — {newMinutes}m</div>
-                  <input type="range" min={1} max={120} value={newMinutes}
+                  <input name="preset-minutes" type="range" min={1} max={120} value={newMinutes}
                     onChange={e => setNewMinutes(parseInt(e.target.value))} className="rng w-full" />
                 </div>
                 <input
+                  name="preset-note"
                   value={newDesc} onChange={e => setNewDesc(e.target.value)}
                   placeholder="Note — e.g. Scales first"
                   className="w-full bg-[#0F0C06] border border-[rgba(242,233,207,0.12)] rounded-lg px-4 py-2.5 text-sm text-flap-ink placeholder:text-flap-dim focus:outline-none font-body"
