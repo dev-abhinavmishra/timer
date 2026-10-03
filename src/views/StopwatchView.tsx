@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw, Flag, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, vibrate } from '../lib/utils';
@@ -34,7 +34,9 @@ export default function StopwatchView() {
   const vp = useViewport();
   const [laps, setLaps] = useState<Lap[]>([]);
   const [copied, setCopied] = useState(false);
-  const stoppedAt = useRef(0);
+  const [keyFlash, setKeyFlash] = useState<string | null>(null);
+
+  const flashKey = (k: string) => { setKeyFlash(k); setTimeout(() => setKeyFlash(null), 160); };
 
   const running = sw.running;
   const time = sw.elapsed;
@@ -44,9 +46,9 @@ export default function StopwatchView() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') { e.preventDefault(); toggle(); }
-      else if (e.key === 'l' || e.key === 'L') addLap();
-      else if (e.key === 'r' || e.key === 'R') resetAll();
+      if (e.code === 'Space') { e.preventDefault(); flashKey('toggle'); toggle(); }
+      else if (e.key === 'l' || e.key === 'L') { flashKey('lap'); addLap(); }
+      else if (e.key === 'r' || e.key === 'R') { flashKey('reset'); resetAll(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -55,7 +57,7 @@ export default function StopwatchView() {
 
   const toggle = () => {
     vibrate(running ? 35 : 55);
-    if (running) { sw.pause(); stoppedAt.current = time; }
+    if (running) sw.pause();
     else sw.start();
   };
 
@@ -234,15 +236,15 @@ export default function StopwatchView() {
 
         {/* transport */}
         <div className="mt-6 grid grid-cols-3 gap-3">
-          <KeyButton onClick={addLap} disabled={!running} className="h-20 flex-col" title="Lap (L)">
+          <KeyButton onClick={addLap} disabled={!running} className={cn('h-20 flex-col', keyFlash === 'lap' && 'key--pressed')} title="Lap (L)">
             <Flag size={20} />
             <span className="text-[9px]">Lap</span>
           </KeyButton>
-          <KeyButton onClick={toggle} variant="signal" className="h-20 flex-col" title="Start / Stop (Space)">
+          <KeyButton onClick={toggle} variant="signal" className={cn('h-20 flex-col', keyFlash === 'toggle' && 'key--pressed')} title="Start / Stop (Space)">
             {running ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-0.5" />}
             <span className="text-[9px]">{running ? 'Stop' : 'Start'}</span>
           </KeyButton>
-          <KeyButton onClick={resetAll} className="h-20 flex-col" title="Reset (R)">
+          <KeyButton onClick={resetAll} className={cn('h-20 flex-col', keyFlash === 'reset' && 'key--pressed')} title="Reset (R)">
             <RotateCcw size={20} />
             <span className="text-[9px]">Reset</span>
           </KeyButton>

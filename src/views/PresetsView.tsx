@@ -45,6 +45,14 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
   const [newIcon, setNewIcon] = useState('Brain');
   const [newAccent, setNewAccent] = useState(false);
 
+  /* esc closes the new-departure sheet */
+  useEffect(() => {
+    if (!showAddModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAddModal(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showAddModal]);
+
   useEffect(() => {
     try {
       const saved = localStorage.getItem(KEY);

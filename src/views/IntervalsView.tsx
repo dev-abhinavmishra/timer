@@ -113,7 +113,8 @@ export default function IntervalsView() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') { e.preventDefault(); run.running ? run.pause() : run.resume(); }
+      if (e.key === 'Escape' && editing) { setEditing(false); return; }
+      if (e.code === 'Space') { e.preventDefault(); if (run.routine) run.running ? run.pause() : run.resume(); }
       else if (e.key === 'Escape') run.routine && run.quit();
     };
     window.addEventListener('keydown', onKey);

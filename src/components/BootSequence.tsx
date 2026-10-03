@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { FlipRow, FlipText } from './Flip';
 import { useViewport } from '../hooks/useViewport';
@@ -11,6 +11,15 @@ export function BootSequence({ onDone }: { onDone: () => void }) {
   const vp = useViewport();
   const [phase, setPhase] = useState(0); // 0 scramble, 1 settle, 2 open
   const [scramble, setScramble] = useState('88:88:88');
+  const skipped = useRef(false);
+
+  // one exit path: fade then open — whichever arrives first wins
+  const finish = (withFade: boolean) => {
+    if (skipped.current) return;
+    skipped.current = true;
+    if (withFade) { setPhase(2); setTimeout(onDone, 500); }
+    else onDone();
+  };
 
   useEffect(() => {
     const iv = setInterval(() => {
@@ -23,8 +32,16 @@ export function BootSequence({ onDone }: { onDone: () => void }) {
       setPhase(1);
     }, 1100);
     const t2 = setTimeout(() => setPhase(2), 2050);
-    const t3 = setTimeout(onDone, 2550);
-    return () => { clearInterval(iv); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const t3 = setTimeout(() => finish(false), 2550);
+    // click or any key jumps straight to the fade-out
+    const onSkip = () => finish(true);
+    window.addEventListener('pointerdown', onSkip);
+    window.addEventListener('keydown', onSkip);
+    return () => {
+      clearInterval(iv); clearTimeout(t1); clearTimeout(t2); clearTimeout(t3);
+      window.removeEventListener('pointerdown', onSkip);
+      window.removeEventListener('keydown', onSkip);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -181,6 +181,7 @@ export function useRoutineRunner() {
   const resume = () => { endAt.current = Date.now() + remainingMs; setRunning(true); };
   const quit = () => { setRunning(false); setRoutine(null); setFinished(false); };
 
-  const nextPhase = routine ? routine.phases[(phaseIdx + 1) % routine.phases.length] : null;
+  const isLastLeg = routine ? (round >= routine.rounds && phaseIdx >= routine.phases.length - 1) : false;
+  const nextPhase = routine && !isLastLeg ? routine.phases[(phaseIdx + 1) % routine.phases.length] : null;
   return { routine, phase, phaseIdx, round, remainingMs, running, finished, nextPhase, start, pause, resume, quit };
 }

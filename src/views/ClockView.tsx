@@ -36,6 +36,7 @@ export default function ClockView() {
   const [newM, setNewM] = useState(30);
   const [newLabel, setNewLabel] = useState('');
   const [firing, setFiring] = useState<Alarm | null>(null);
+  const [firingSnoozed, setFiringSnoozed] = useState(false);
   const stopRing = useRef<null | (() => void)>(null);
   const firedKeys = useRef<Set<string>>(new Set());
   const snoozes = useRef<Map<string, number>>(new Map()); // alarmId → fire-at timestamp
@@ -51,21 +52,43 @@ export default function ClockView() {
   useEffect(() => {
     const minute = `${now.getHours()}:${now.getMinutes()}`;
     const hit = alarms.find(a => {
+      if (!a.on) return false;
       if (firedKeys.current.has(`${a.id}:${minute}`)) return false;
       const snoozedAt = snoozes.current.get(a.id);
-      if (snoozedAt != null && now.getTime() >= snoozedAt) return true;
-      return a.on && a.hh === now.getHours() && a.mm === now.getMinutes();
+      if (snoozedAt != null) return now.getTime() >= snoozedAt;
+      return a.hh === now.getHours() && a.mm === now.getMinutes();
     });
     if (hit && !firing) {
       firedKeys.current.add(`${hit.id}:${minute}`);
-      snoozes.current.delete(hit.id);
       if (firedKeys.current.size > 200) firedKeys.current.clear();
+      setFiringSnoozed(snoozes.current.delete(hit.id));
       setFiring(hit);
       vibrate([200, 100, 200, 100, 400]);
       stopRing.current = alarmRing();
+      document.title = `● ${(hit.label || 'Alarm').toUpperCase()} — Timer`;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
+
+  /* title + keys while the alarm takeover is up */
+  useEffect(() => {
+    if (!firing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Space' || e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); }
+      else if (e.key === 's' || e.key === 'S') snooze();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); document.title = 'Timer — Time Instruments'; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firing]);
+
+  /* esc closes the add-alarm sheet */
+  useEffect(() => {
+    if (!showAdd) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAdd(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showAdd]);
 
   const dismiss = () => {
     stopRing.current?.(); stopRing.current = null;
@@ -231,7 +254,7 @@ export default function ClockView() {
               <AlarmClock size={40} style={{ color: 'var(--color-signal-bright)' }} />
               <FlipText text={(firing.label || 'ALARM').toUpperCase().slice(0, 14)} size={Math.min(64, vp.w / 14)} />
               <div className="engraved text-sm" style={{ letterSpacing: '0.4em' }}>
-                {String(firing.hh).padStart(2, '0')}:{String(firing.mm).padStart(2, '0')} — NOW
+                {String(firing.hh).padStart(2, '0')}:{String(firing.mm).padStart(2, '0')} — {firingSnoozed ? 'SNOOZED' : 'NOW'}
               </div>
               <div className="flex gap-4 mt-2">
                 <KeyButton variant="signal" className="px-10 py-4 text-sm" onClick={dismiss}>Dismiss</KeyButton>

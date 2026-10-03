@@ -37,8 +37,11 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const [customOpen, setCustomOpen] = useState(false);
   const [customMin, setCustomMin] = useState(25);
   const [done, setDone] = useState<null | 'focus' | 'break'>(null);
+  const [keyFlash, setKeyFlash] = useState<string | null>(null);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashKey = (k: string) => { setKeyFlash(k); setTimeout(() => setKeyFlash(null), 160); };
 
   /* cancel a pending focus→break hand-off on unmount */
   useEffect(() => () => { if (chainTimer.current) clearTimeout(chainTimer.current); }, []);
@@ -105,9 +108,16 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.code === 'Space') { e.preventDefault(); toggle(); }
-      else if (e.key === 'r' || e.key === 'R') resetTimer();
-      else if (e.key === 'f' || e.key === 'F') running && enterFocus(true);
+      if (done) {
+        // the completion takeover owns the keys — no ghost restarts underneath
+        if (e.code === 'Space' || e.key === 'Enter') { e.preventDefault(); setDone(null); resetTimer(); }
+        else if (e.key === 'r' || e.key === 'R') resetTimer();
+        else if (e.key === 'Escape') setDone(null);
+        return;
+      }
+      if (e.code === 'Space') { e.preventDefault(); flashKey('toggle'); toggle(); }
+      else if (e.key === 'r' || e.key === 'R') { flashKey('reset'); resetTimer(); }
+      else if (e.key === 'f' || e.key === 'F') { if (running) { flashKey('focus'); enterFocus(true); } }
       else if (e.key === 'Escape') { enterFocus(false); setCustomOpen(false); }
     };
     window.addEventListener('keydown', onKey);
@@ -118,7 +128,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const completeFocus = () => {
     vibrate([120, 80, 120, 80, 300]);
     stationChime();
-    const recess = isBreak || /recess|break|rest/i.test(label || '');
+    const recess = isBreak || /recess|break|rest/i.test(label ?? secLabel(cd.totalMs / 1000));
     saveSession({ duration: cd.totalMs / 1000, type: recess ? 'break' : 'focus', label: intent || undefined, preset: label });
     if (!isBreak && thenBreak > 0) {
       setDone('focus');
@@ -232,13 +242,13 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
 
           {/* transport */}
           <div className="mt-8 flex items-center justify-center gap-5">
-            <KeyButton onClick={resetTimer} title="Reset (R)" className="w-16 h-16 !rounded-full" haptic={0}>
+            <KeyButton onClick={resetTimer} title="Reset (R)" className={cn('w-16 h-16 !rounded-full', keyFlash === 'reset' && 'key--pressed')} haptic={0}>
               <RotateCcw size={22} />
             </KeyButton>
             <KeyButton
               onClick={toggle}
               variant="signal"
-              className="w-24 h-24 !rounded-full"
+              className={cn('w-24 h-24 !rounded-full', keyFlash === 'toggle' && 'key--pressed')}
               title="Start / Pause (Space)"
             >
               {running ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" className="ml-1.5" />}
@@ -247,7 +257,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
               onClick={() => enterFocus(!focus)}
               disabled={!running && !focus}
               title="Focus mode (F)"
-              className="w-16 h-16 !rounded-full"
+              className={cn('w-16 h-16 !rounded-full', keyFlash === 'focus' && 'key--pressed')}
             >
               <Focus size={22} />
             </KeyButton>

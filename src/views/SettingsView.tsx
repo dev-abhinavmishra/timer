@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Palette, CheckCircle2, RefreshCcw, AlertTriangle, X, Volume2, Gauge, Keyboard, MoonStar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { vibrate, cn } from '../lib/utils';
@@ -11,6 +11,14 @@ export default function SettingsView() {
   const settings = useSettings();
   const [confirm, setConfirm] = useState(false);
   const [toast, setToast] = useState(false);
+
+  /* esc backs out of the wipe confirmation */
+  useEffect(() => {
+    if (!confirm) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setConfirm(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirm]);
 
   const clearAll = () => {
     clearSessions();
