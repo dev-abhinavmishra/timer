@@ -158,13 +158,20 @@ export function RollDigit({ value, className }: { value: string; className?: str
   const [curr, setCurr] = useState(value);
   const [prev, setPrev] = useState<string | null>(null);
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<string | null>(null); // target of an in-flight roll
 
   useEffect(() => {
-    if (value === curr) return;
-    setPrev(curr);
+    if (value === curr && pending.current === null) return;
+    if (value === pending.current) return; // already rolling to this
+    // roll from wherever the previous roll was heading, not the stale commit
+    setPrev(pending.current !== null ? pending.current : curr);
+    pending.current = value;
     if (t.current) clearTimeout(t.current);
-    t.current = setTimeout(() => { setCurr(value); setPrev(null); }, 95);
-    return () => { if (t.current) clearTimeout(t.current); };
+    t.current = setTimeout(() => {
+      pending.current = null;
+      setCurr(value);
+      setPrev(null);
+    }, 95);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 

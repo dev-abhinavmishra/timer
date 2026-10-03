@@ -87,10 +87,10 @@ export function useNow(stepMs = 1000) {
 export function useWakeLock(active: boolean) {
   const lock = useRef<any>(null);
   useEffect(() => {
-    let cancelled = false;
+    let live = true;
     const acquire = async () => {
       try {
-        if (active && 'wakeLock' in navigator && !lock.current) {
+        if (live && active && 'wakeLock' in navigator && !lock.current) {
           lock.current = await (navigator as any).wakeLock.request('screen');
         }
       } catch { /* unsupported or denied — fine */ }
@@ -99,10 +99,10 @@ export function useWakeLock(active: boolean) {
     const onVis = () => { if (document.visibilityState === 'visible') acquire(); };
     document.addEventListener('visibilitychange', onVis);
     return () => {
-      cancelled = true;
+      live = false;
       document.removeEventListener('visibilitychange', onVis);
-      if (!active && lock.current) { try { lock.current.release(); } catch {} lock.current = null; }
-      void cancelled;
+      // release whatever this effect acquired — re-run or unmount alike
+      if (lock.current) { try { lock.current.release(); } catch {} lock.current = null; }
     };
   }, [active]);
 }
@@ -141,20 +141,30 @@ export function useRoutineRunner() {
 
   const advance = () => {
     if (!routine) return;
-    let p = phaseIdx + 1;
+    const now = Date.now();
+    let p = phaseIdx;
     let r = round;
-    if (p >= routine.phases.length) { p = 0; r = round + 1; }
-    if (r > routine.rounds) {
-      setRunning(false);
-      setFinished(true);
-      setRemainingMs(0);
-      return;
+    let end = endAt.current;
+    // chain from the phase that just ended — in a throttled tab several
+    // phases may have elapsed; skip straight to the one still in the future
+    for (let i = 0; i < routine.phases.length * routine.rounds + 1; i++) {
+      p += 1;
+      if (p >= routine.phases.length) { p = 0; r += 1; }
+      if (r > routine.rounds) {
+        setRunning(false);
+        setFinished(true);
+        setRemainingMs(0);
+        return;
+      }
+      end += routine.phases[p].seconds * 1000;
+      if (end > now) break;
     }
+    const next = routine.phases[p];
+    if (!next) { setRunning(false); setFinished(true); setRemainingMs(0); return; }
     setPhaseIdx(p);
     setRound(r);
-    const next = routine.phases[p];
-    endAt.current = Date.now() + next.seconds * 1000;
-    setRemainingMs(next.seconds * 1000);
+    endAt.current = end;
+    setRemainingMs(Math.max(0, end - now));
   };
 
   const start = (r: Routine) => {

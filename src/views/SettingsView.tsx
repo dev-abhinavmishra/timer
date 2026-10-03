@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Palette, CheckCircle2, RefreshCcw, AlertTriangle, X, Volume2, Gauge, Keyboard } from 'lucide-react';
+import { Palette, CheckCircle2, RefreshCcw, AlertTriangle, X, Volume2, Gauge, Keyboard, MoonStar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { vibrate, cn } from '../lib/utils';
 import { clearSessions } from '../lib/stats';
@@ -68,7 +68,7 @@ export default function SettingsView() {
       {/* behaviour */}
       <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
         {sectionHead(<Gauge size={20} />, 'Behaviour')}
-        <div className="panel-wall divide-y divide-[rgba(38,33,16,0.1)]">
+        <div className="panel-wall divide-y divide-[rgb(var(--ink-rgb) / 0.1)]">
           {[
             {
               icon: <Volume2 size={17} />,
@@ -84,6 +84,13 @@ export default function SettingsView() {
               on: settings.motion === 'full',
               toggle: () => updateSettings({ motion: settings.motion === 'full' ? 'reduced' : 'full' }),
             },
+            {
+              icon: <MoonStar size={17} />,
+              title: 'Night board',
+              desc: 'Graphite wall and dim ink for low light. Off keeps the plaster room.',
+              on: settings.theme === 'night',
+              toggle: () => updateSettings({ theme: settings.theme === 'night' ? 'day' : 'night' }),
+            },
           ].map(row => (
             <div key={row.title} className="flex items-center justify-between p-5 gap-4">
               <div className="flex items-center gap-4">
@@ -97,14 +104,14 @@ export default function SettingsView() {
                 onClick={() => { vibrate(15); row.toggle(); }}
                 className={cn(
                   'w-14 h-8 rounded-full relative transition-colors shrink-0',
-                  row.on ? 'bg-[color:var(--color-signal)]' : 'bg-[rgba(38,33,16,0.2)]'
+                  row.on ? 'bg-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb) / 0.2)]'
                 )}
                 role="switch" aria-checked={row.on}
               >
                 <motion.span
                   animate={{ x: row.on ? 26 : 2 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                  className="absolute top-1 w-6 h-6 rounded-full bg-[#F2EADA] shadow"
+                  className="absolute top-1 w-6 h-6 rounded-full bg-[color:var(--rng-thumb-a)] shadow"
                 />
               </button>
             </div>

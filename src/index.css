@@ -2,10 +2,12 @@
 @import "tailwindcss";
 
 /*
-  PLATFORM — split-flap departure-board timer.
+  TIMER — split-flap departure-board time instruments.
   A warm plaster wall carries charcoal instrument housings; digits are bone
   on near-black flaps. One signal colour (orange by default) marks live
   elements. Brass is the secondary instrument accent.
+  html[data-theme='night'] re-skins the wall to a dark graphite cockpit —
+  same instruments, dimmer room.
 */
 @theme {
   --color-wall: #EAE3D0;
@@ -39,9 +41,92 @@
   --font-label: 'Barlow Semi Condensed', 'Barlow Condensed', sans-serif;
 }
 
+:root {
+  --ink-rgb: 38 33 16;             /* warm ink, used for alpha tints */
+  --signal-rgb: 232 73 15;         /* current accent as channels */
+  --wall-panel: rgba(255, 252, 240, 0.5);
+  --wall-panel-line: rgba(255, 252, 240, 0.6);
+  --wall-panel-glow: rgba(38, 33, 16, 0.1);
+  --chip-bg: rgba(255, 252, 240, 0.35);
+  --key-paper-face: #F2EADA;
+  --key-paper-edge: #B3A782;
+  --rng-thumb-a: #F2EADA;
+  --rng-thumb-b: #C9BFA2;
+  --rng-thumb-edge: rgba(38, 33, 16, 0.6);
+  --rng-thumb-shade: #8A7E5C;
+  --scroll-thumb: var(--color-wall-edge);
+  --dial-blend: multiply;
+  --mark-flap: var(--color-board);
+}
+
 @theme inline {
   --color-accent: var(--color-signal);
 }
+
+/* ============ NIGHT — the same instruments on a dark graphite wall ============ */
+html[data-theme='night'] {
+  --color-wall: #0F1116;
+  --color-wall-deep: #0A0C10;
+  --color-wall-edge: #1E2330;
+
+  --color-ink: #E4E2D4;
+  --color-ink-soft: #8B8D84;
+  --color-ink-faint: #5A5C58;
+
+  --color-board: #1B1F29;
+  --color-board-2: #0D0F14;
+  --color-board-3: #262B38;
+  --color-flap: #242834;
+  --color-flap-hi: #333947;
+  --color-flap-ink: #EDEBDC;
+  --color-flap-dim: #6C7280;
+
+  --color-rule: rgba(228, 226, 212, 0.13);
+  --color-rule-board: rgba(237, 235, 221, 0.14);
+
+  --ink-rgb: 228 226 212;
+  --wall-panel: rgba(26, 31, 42, 0.72);
+  --wall-panel-line: rgba(160, 172, 204, 0.09);
+  --wall-panel-glow: rgba(0, 0, 0, 0.35);
+  --chip-bg: rgba(228, 226, 212, 0.05);
+  --key-paper-face: #2C323F;
+  --key-paper-edge: #14171F;
+  --rng-thumb-a: #39404F;
+  --rng-thumb-b: #272C38;
+  --rng-thumb-edge: rgba(228, 226, 212, 0.3);
+  --rng-thumb-shade: #14171F;
+  --scroll-thumb: #2A2F3C;
+  --dial-blend: normal;
+  --mark-flap: #39404F;
+}
+
+html[data-theme='night'] .wall-tex {
+  background-image:
+    radial-gradient(1200px 600px at 50% -10%, rgba(86, 108, 150, 0.17), transparent 60%),
+    radial-gradient(900px 500px at 85% 110%, rgba(16, 22, 34, 0.6), transparent 55%),
+    linear-gradient(rgba(146, 162, 196, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(146, 162, 196, 0.05) 1px, transparent 1px),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.22 0 0 0 0 0.28 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: auto, auto, 28px 28px, 28px 28px, auto;
+}
+
+html[data-theme='night'] .board {
+  box-shadow:
+    inset 0 1px 0 rgba(200, 214, 240, 0.10),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(146, 162, 196, 0.14),
+    0 10px 24px rgba(0, 0, 0, 0.55),
+    0 30px 60px rgba(0, 0, 0, 0.45);
+}
+html[data-theme='night'] .flap-half--bot,
+html[data-theme='night'] .flap-leaf--bot {
+  background: linear-gradient(180deg, #1C2029 0%, var(--color-flap) 30%, #1E222C 100%);
+}
+html[data-theme='night'] .panel-wall {
+  background: var(--wall-panel);
+  box-shadow: 0 1px 0 var(--wall-panel-line) inset, 0 8px 20px var(--wall-panel-glow);
+}
+html[data-theme='night'] .board-inset { background: #0A0B0F; }
 
 @layer utilities {
   /* ---- Wall ---- */
@@ -316,21 +401,21 @@
       0 3px 8px rgba(15, 12, 6, 0.4);
   }
   .key--paper {
-    --key-face: #F2EADA;
+    --key-face: var(--key-paper-face);
     --key-ink: var(--color-ink);
-    border-color: rgba(38, 33, 16, 0.45);
+    border-color: rgb(var(--ink-rgb) / 0.45);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.7),
-      inset 0 -3px 6px rgba(120, 105, 70, 0.25),
-      0 4px 0 #B3A782,
-      0 10px 18px rgba(38, 33, 16, 0.25);
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -3px 6px rgb(var(--ink-rgb) / 0.2),
+      0 4px 0 var(--key-paper-edge),
+      0 10px 18px rgb(var(--ink-rgb) / 0.25);
   }
   .key--paper:active, .key--paper.key--pressed {
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.6),
-      inset 0 -2px 4px rgba(120, 105, 70, 0.2),
-      0 0 0 #B3A782,
-      0 3px 8px rgba(38, 33, 16, 0.2);
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -2px 4px rgb(var(--ink-rgb) / 0.18),
+      0 0 0 var(--key-paper-edge),
+      0 3px 8px rgb(var(--ink-rgb) / 0.2);
   }
 
   /* engraved label on board metal */
@@ -361,7 +446,7 @@
     border-radius: 6px;
     border: 1px solid var(--color-rule);
     color: var(--color-ink-soft);
-    background: rgba(255, 252, 240, 0.35);
+    background: var(--chip-bg);
     transition: all 120ms ease;
     cursor: pointer;
   }
@@ -374,14 +459,14 @@
   .chip--on:hover { color: var(--color-wall); }
 
   .panel-wall {
-    background: rgba(255, 252, 240, 0.5);
+    background: var(--wall-panel);
     border: 1px solid var(--color-rule);
     border-radius: 10px;
-    box-shadow: 0 1px 0 rgba(255, 252, 240, 0.6) inset, 0 8px 20px rgba(38, 33, 16, 0.1);
+    box-shadow: 0 1px 0 var(--wall-panel-line) inset, 0 8px 20px var(--wall-panel-glow);
   }
 
   .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--color-wall-edge); border-radius: 3px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
   .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -401,15 +486,15 @@ input[type="range"].rng::-webkit-slider-thumb {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: linear-gradient(180deg, #F2EADA, #C9BFA2);
-  border: 1px solid rgba(38, 33, 16, 0.6);
-  box-shadow: 0 2px 0 #8A7E5C, 0 4px 8px rgba(0,0,0,0.4);
+  background: linear-gradient(180deg, var(--rng-thumb-a), var(--rng-thumb-b));
+  border: 1px solid var(--rng-thumb-edge);
+  box-shadow: 0 2px 0 var(--rng-thumb-shade), 0 4px 8px rgba(0,0,0,0.4);
   cursor: grab;
 }
 input[type="range"].rng::-moz-range-thumb {
   width: 22px; height: 22px; border-radius: 50%;
-  background: #F2EADA; border: 1px solid rgba(38,33,16,0.6);
-  box-shadow: 0 2px 0 #8A7E5C; cursor: grab;
+  background: var(--rng-thumb-a); border: 1px solid var(--rng-thumb-edge);
+  box-shadow: 0 2px 0 var(--rng-thumb-shade); cursor: grab;
 }
 
 body {
@@ -429,3 +514,13 @@ body {
 html[data-motion="reduced"] .flap--flipping .flap-leaf--top,
 html[data-motion="reduced"] .flap--flipping .flap-leaf--bot { animation-duration: 1ms !important; animation-delay: 0ms !important; }
 html[data-motion="reduced"] .flap-colon--live i { animation: none; }
+
+/* honour the switch app-wide: ambient loops collapse instantly,
+   tactile transitions stay short. MotionConfig covers framer-motion. */
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}

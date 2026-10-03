@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { flapTick, unlockAudio } from '../lib/sound';
 import { vibrate } from '../lib/utils';
 
@@ -17,6 +17,10 @@ export function RotaryDial({
   const ref = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const lastMinute = useRef(minutes);
+
+  /* keep the detent cache in step when minutes change from outside
+     (quick chips, presets) so dragging back to them still fires */
+  useEffect(() => { lastMinute.current = minutes; }, [minutes]);
 
   const angleFor = (m: number) => (m / max) * 360;
 
@@ -89,13 +93,13 @@ export function RotaryDial({
     >
       <svg viewBox="0 0 300 300" className="absolute inset-0 w-full h-full">
         {/* outer bezel */}
-        <circle cx={cx} cy={cy} r={R + 8} fill="none" stroke="rgba(38,33,16,0.35)" strokeWidth="1.5" />
-        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(38,33,16,0.25)" strokeWidth="1" />
+        <circle cx={cx} cy={cy} r={R + 8} fill="none" stroke="rgb(var(--ink-rgb) / 0.35)" strokeWidth="1.5" />
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgb(var(--ink-rgb) / 0.25)" strokeWidth="1" />
         {ticks.map((t, i) => (
           <line
             key={i}
             x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2}
-            stroke={i <= minutes ? 'var(--color-signal)' : 'rgba(38,33,16,0.45)'}
+            stroke={i <= minutes ? 'var(--color-signal)' : 'rgb(var(--ink-rgb) / 0.45)'}
             strokeWidth={t.major ? 2.4 : 1.2}
             strokeLinecap="round"
             opacity={i <= minutes ? 0.9 : 0.5}
@@ -112,7 +116,7 @@ export function RotaryDial({
           style={{ filter: 'drop-shadow(0 0 6px rgba(232,73,15,0.45))' }}
         />
         {/* track under arc */}
-        <circle cx={cx} cy={cy} r={arcR} fill="none" stroke="rgba(38,33,16,0.14)" strokeWidth="7" style={{ mixBlendMode: 'multiply' }} />
+        <circle cx={cx} cy={cy} r={arcR} fill="none" stroke="rgb(var(--ink-rgb) / 0.14)" strokeWidth="7" style={{ mixBlendMode: 'var(--dial-blend, multiply)' as React.CSSProperties['mixBlendMode'] }} />
         {/* handle */}
         {minutes > 0 && (
           <g transform={`translate(${hx} ${hy})`}>

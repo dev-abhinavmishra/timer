@@ -39,7 +39,7 @@ export function BootSequence({ onDone }: { onDone: () => void }) {
       transition={{ duration: 0.5, ease: [0.32, 0.72, 0, 1] }}
     >
       <div className="engraved text-[10px] mb-6" style={{ letterSpacing: '0.5em' }}>
-        {phase === 0 ? 'POWER ON SELF TEST' : 'PLATFORM — TIME INSTRUMENTS'}
+        {phase === 0 ? 'POWER ON SELF TEST' : 'TIMER — TIME INSTRUMENTS'}
       </div>
       <FlipRow text={scramble} size={size} duration={phase === 0 ? 90 : 300} delayStep={phase === 0 ? 20 : 55} />
       <motion.div

@@ -23,15 +23,24 @@ export interface AppSettings {
   accent: string;      // ACCENTS[].name
   sound: boolean;
   motion: 'full' | 'reduced';
+  theme: 'day' | 'night';
 }
 
-const KEY = 'platform.settings.v1';
-const DEFAULTS: AppSettings = { accent: 'Signal', sound: true, motion: 'full' };
+const KEY = 'timer.settings.v1';
+const LEGACY_KEYS = ['platform.settings.v1'];
+const DEFAULTS: AppSettings = { accent: 'Signal', sound: true, motion: 'full', theme: 'day' };
 
 let current: AppSettings = (() => {
   if (typeof window === 'undefined') return DEFAULTS;
   try {
-    const raw = localStorage.getItem(KEY);
+    let raw = localStorage.getItem(KEY);
+    if (!raw) {
+      // one-time key migration — keep the user's settings
+      for (const legacy of LEGACY_KEYS) {
+        const old = localStorage.getItem(legacy);
+        if (old) { raw = old; localStorage.setItem(KEY, old); localStorage.removeItem(legacy); break; }
+      }
+    }
     return raw ? { ...DEFAULTS, ...JSON.parse(raw) } : DEFAULTS;
   } catch { return DEFAULTS; }
 })();
@@ -48,13 +57,20 @@ export function updateSettings(patch: Partial<AppSettings>) {
   emit();
 }
 
+const hexToRgbTriplet = (hex: string) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+};
+
 export function applySettings(s: AppSettings = current) {
   const t = getAccent(s.accent);
   const r = document.documentElement.style;
   r.setProperty('--color-signal', t.signal);
   r.setProperty('--color-signal-bright', t.bright);
   r.setProperty('--color-signal-deep', t.deep);
+  r.setProperty('--signal-rgb', hexToRgbTriplet(t.signal));
   document.documentElement.dataset.motion = s.motion;
+  document.documentElement.dataset.theme = s.theme;
   setSoundEnabled(s.sound);
 }
 

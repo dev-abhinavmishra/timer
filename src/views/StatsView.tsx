@@ -32,7 +32,7 @@ export default function StatsView() {
     const blob = new Blob([sessionsCsv(getSessions())], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'platform-sessions.csv';
+    a.download = 'timer-sessions.csv';
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -117,7 +117,7 @@ export default function StatsView() {
               <div className="flex items-end justify-between h-44 gap-3">
                 {stats.chartData.map((h, i) => (
                   <div key={i} className="flex-1 flex flex-col items-center gap-3 h-full">
-                    <div className="w-full h-full relative rounded-t-[3px] overflow-hidden" style={{ background: 'rgba(38,33,16,0.08)' }}>
+                    <div className="w-full h-full relative rounded-t-[3px] overflow-hidden" style={{ background: 'rgb(var(--ink-rgb) / 0.08)' }}>
                       <motion.div
                         initial={{ height: 0 }}
                         animate={{ height: h }}
@@ -186,7 +186,7 @@ export default function StatsView() {
                   className="panel-wall px-4 py-3 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-9 h-9 rounded-md bg-[rgba(38,33,16,0.07)] flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-md bg-[rgb(var(--ink-rgb) / 0.07)] flex items-center justify-center shrink-0">
                       <m.icon size={16} className={s.type === 'focus' ? 'text-[color:var(--color-signal)]' : 'text-ink-soft'} />
                     </div>
                     <div className="min-w-0">

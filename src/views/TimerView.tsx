@@ -38,6 +38,10 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const [customMin, setCustomMin] = useState(25);
   const [done, setDone] = useState<null | 'focus' | 'break'>(null);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* cancel a pending focus→break hand-off on unmount */
+  useEffect(() => () => { if (chainTimer.current) clearTimeout(chainTimer.current); }, []);
 
   const hasTime = cd.totalMs > 0;
   const running = cd.running;
@@ -58,8 +62,8 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   /* ---------- title bar ---------- */
   useEffect(() => {
     if (running) document.title = `${fmt(cd.secondsLeft)} — ${isBreak ? 'Break' : (label || 'Focus')}`;
-    else document.title = 'Platform — Time Instruments';
-    return () => { document.title = 'Platform — Time Instruments'; };
+    else document.title = 'Timer — Time Instruments';
+    return () => { document.title = 'Timer — Time Instruments'; };
   }, [running, cd.secondsLeft, label, isBreak]);
 
   /* ---------- per-second tick ---------- */
@@ -114,10 +118,13 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const completeFocus = () => {
     vibrate([120, 80, 120, 80, 300]);
     stationChime();
-    saveSession({ duration: cd.totalMs / 1000, type: isBreak ? 'break' : 'focus', label: intent || undefined, preset: label });
+    const recess = isBreak || /recess|break|rest/i.test(label || '');
+    saveSession({ duration: cd.totalMs / 1000, type: recess ? 'break' : 'focus', label: intent || undefined, preset: label });
     if (!isBreak && thenBreak > 0) {
       setDone('focus');
-      setTimeout(() => {
+      if (chainTimer.current) clearTimeout(chainTimer.current);
+      chainTimer.current = setTimeout(() => {
+        chainTimer.current = null;
         setDone(null);
         setIsBreak(true);
         cd.start(thenBreak * 60000, completeBreak);
@@ -142,6 +149,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
 
   const resetTimer = () => {
     vibrate([25, 40, 25]);
+    if (chainTimer.current) { clearTimeout(chainTimer.current); chainTimer.current = null; }
     cd.reset(setMinutes * 60000);
     setIsBreak(false);
     setDone(null);
@@ -214,7 +222,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
             </div>
             <div className="mt-3 flex justify-between items-baseline px-0.5">
               <span className="engraved text-[9px] md:text-[10px]">
-                {intent ? intent.toUpperCase() : 'PLATFORM TIMEKEEPING'}
+                {intent ? intent.toUpperCase() : 'TIMER TIMEKEEPING'}
               </span>
               <span className="engraved text-[9px] md:text-[10px]">
                 {hasTime ? `${Math.round(cd.progress * 100)}% ELAPSED` : `SET FOR ${fmt(setMinutes * 60)}`}

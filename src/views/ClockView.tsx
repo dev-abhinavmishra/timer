@@ -9,10 +9,22 @@ import { KeyButton } from '../components/KeyButton';
 import { alarmRing, flapTick } from '../lib/sound';
 
 interface Alarm { id: string; hh: number; mm: number; on: boolean; label: string }
-const KEY = 'platform.alarms.v1';
+const KEY = 'timer.alarms.v1';
+const LEGACY_KEY = 'platform.alarms.v1';
 
 function loadAlarms(): Alarm[] {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  try {
+    const data = localStorage.getItem(KEY);
+    if (data) return JSON.parse(data);
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      localStorage.setItem(KEY, legacy);
+      localStorage.removeItem(LEGACY_KEY);
+      return parsed;
+    }
+  } catch { /* fall through */ }
+  return [];
 }
 
 export default function ClockView() {
@@ -25,19 +37,29 @@ export default function ClockView() {
   const [newLabel, setNewLabel] = useState('');
   const [firing, setFiring] = useState<Alarm | null>(null);
   const stopRing = useRef<null | (() => void)>(null);
-  const lastFiredKey = useRef('');
+  const firedKeys = useRef<Set<string>>(new Set());
+  const snoozes = useRef<Map<string, number>>(new Map()); // alarmId → fire-at timestamp
 
   useWakeLock(!!firing);
 
   const save = (a: Alarm[]) => { setAlarms(a); localStorage.setItem(KEY, JSON.stringify(a)); };
 
+  /* stop the ring if the view unmounts mid-alarm */
+  useEffect(() => () => { stopRing.current?.(); stopRing.current = null; }, []);
+
   /* fire check — once per minute per alarm */
   useEffect(() => {
-    const key = `${now.toDateString()}:${now.getHours()}:${now.getMinutes()}`;
-    if (lastFiredKey.current === key) return;
-    const hit = alarms.find(a => a.on && a.hh === now.getHours() && a.mm === now.getMinutes());
+    const minute = `${now.getHours()}:${now.getMinutes()}`;
+    const hit = alarms.find(a => {
+      if (firedKeys.current.has(`${a.id}:${minute}`)) return false;
+      const snoozedAt = snoozes.current.get(a.id);
+      if (snoozedAt != null && now.getTime() >= snoozedAt) return true;
+      return a.on && a.hh === now.getHours() && a.mm === now.getMinutes();
+    });
     if (hit && !firing) {
-      lastFiredKey.current = key;
+      firedKeys.current.add(`${hit.id}:${minute}`);
+      snoozes.current.delete(hit.id);
+      if (firedKeys.current.size > 200) firedKeys.current.clear();
       setFiring(hit);
       vibrate([200, 100, 200, 100, 400]);
       stopRing.current = alarmRing();
@@ -51,11 +73,8 @@ export default function ClockView() {
   };
   const snooze = () => {
     stopRing.current?.(); stopRing.current = null;
-    const t = new Date(now.getTime() + 10 * 60000);
-    const base = (firing!.label || 'Alarm').replace(/ \+\d+m$/, '');
-    const snoozed = { ...firing!, hh: t.getHours(), mm: t.getMinutes(), on: true, label: base + ' +10m' };
-    lastFiredKey.current = '';
-    save(alarms.map(a => a.id === firing!.id ? snoozed : a));
+    // transient snooze — the saved alarm keeps its real time
+    snoozes.current.set(firing!.id, Date.now() + 10 * 60000);
     setFiring(null);
   };
 

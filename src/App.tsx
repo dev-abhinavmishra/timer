@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { Timer, Watch, Clock, Repeat2, LayoutGrid, BarChart3, Settings } from 'lucide-react';
 import { cn, vibrate } from '@/src/lib/utils';
 import { unlockAudio, flapTick } from '@/src/lib/sound';
-import { applySettings } from '@/src/lib/settings';
+import { applySettings, useSettings } from '@/src/lib/settings';
 import TimerView from './views/TimerView';
 import StopwatchView from './views/StopwatchView';
 import ClockView from './views/ClockView';
@@ -30,6 +30,7 @@ export default function App() {
   const [preset, setPreset] = useState<{ minutes: number; name?: string; n: number }>({ minutes: 25, n: 0 });
   const [focusMode, setFocusMode] = useState(false);
   const [booted, setBooted] = useState(false);
+  const settings = useSettings();
 
   useEffect(() => {
     applySettings();
@@ -48,6 +49,7 @@ export default function App() {
   };
 
   return (
+    <MotionConfig reducedMotion={settings.motion === 'reduced' ? 'always' : 'user'}>
     <div className="min-h-screen flex flex-col wall-tex text-ink font-body overflow-x-hidden">
       {!booted && <BootSequence onDone={() => setBooted(true)} />}
 
@@ -64,11 +66,11 @@ export default function App() {
             <div className="flex items-center gap-3">
               {/* wordmark — a tiny two-flap mark + type */}
               <div className="flex gap-[3px]">
-                <span className="block w-[13px] h-[18px] rounded-[2px]" style={{ background: 'var(--color-board)', boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.4)' }} />
+                <span className="block w-[13px] h-[18px] rounded-[2px]" style={{ background: 'var(--mark-flap)', boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.4)' }} />
                 <span className="block w-[13px] h-[18px] rounded-[2px]" style={{ background: 'var(--color-signal)', boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.35)' }} />
               </div>
               <div className="flex flex-col leading-none">
-                <span className="font-display font-bold text-lg tracking-[0.14em] text-ink">PLATFORM</span>
+                <span className="font-display font-bold text-lg tracking-[0.14em] text-ink">TIMER</span>
                 <span className="label-wall text-[8px]" style={{ letterSpacing: '0.34em' }}>TIME INSTRUMENTS</span>
               </div>
             </div>
@@ -157,5 +159,6 @@ export default function App() {
         )}
       </AnimatePresence>
     </div>
+    </MotionConfig>
   );
 }

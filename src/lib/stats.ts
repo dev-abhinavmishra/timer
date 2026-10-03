@@ -7,8 +7,8 @@ export interface Session {
   preset?: string;  // preset/routine name
 }
 
-const STORAGE_KEY = 'platform.sessions.v1';
-const LEGACY_KEY = 'obsidian_pulse_sessions';
+const STORAGE_KEY = 'timer.sessions.v1';
+const LEGACY_KEYS = ['platform.sessions.v1', 'obsidian_pulse_sessions'];
 
 export function saveSession(session: Omit<Session, 'id' | 'timestamp'>) {
   if (typeof window === 'undefined') return;
@@ -27,12 +27,15 @@ export function getSessions(): Session[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     if (data) return JSON.parse(data);
-    // one-time migration from the previous app build
-    const legacy = localStorage.getItem(LEGACY_KEY);
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      localStorage.setItem(STORAGE_KEY, legacy);
-      return parsed;
+    // one-time migration from previous builds
+    for (const legacyKey of LEGACY_KEYS) {
+      const legacy = localStorage.getItem(legacyKey);
+      if (legacy) {
+        const parsed = JSON.parse(legacy);
+        localStorage.setItem(STORAGE_KEY, legacy);
+        localStorage.removeItem(legacyKey);
+        return parsed;
+      }
     }
     return [];
   } catch (e) {
@@ -42,7 +45,7 @@ export function getSessions(): Session[] {
 
 export function clearSessions() {
   localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(LEGACY_KEY);
+  LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
 }
 
 export function sessionsCsv(sessions: Session[]): string {
@@ -50,7 +53,8 @@ export function sessionsCsv(sessions: Session[]): string {
     const d = new Date(s.timestamp);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     const label = (s.label || '').replace(/"/g, '""');
-    return `"${iso}","${s.type}",${s.duration},"${label}","${s.preset || ''}"`;
+    const preset = (s.preset || '').replace(/"/g, '""');
+    return `"${iso}","${s.type}",${s.duration},"${label}","${preset}"`;
   });
   return ['"date","type","seconds","label","preset"', ...rows].join('\n');
 }

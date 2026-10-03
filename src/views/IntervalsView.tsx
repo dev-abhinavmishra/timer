@@ -10,7 +10,8 @@ import { KeyButton } from '../components/KeyButton';
 import { stationChime, flapLand, secondTick } from '../lib/sound';
 import { useRef } from 'react';
 
-const KEY = 'platform.routines.v1';
+const KEY = 'timer.routines.v1';
+const LEGACY_KEY = 'platform.routines.v1';
 
 const BUILT_INS: Routine[] = [
   { id: 'pomodoro', name: 'Pomodoro', rounds: 4, phases: [
@@ -28,7 +29,18 @@ const BUILT_INS: Routine[] = [
 ];
 
 function loadRoutines(): Routine[] {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  try {
+    const data = localStorage.getItem(KEY);
+    if (data) return JSON.parse(data);
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      const parsed = JSON.parse(legacy);
+      localStorage.setItem(KEY, legacy);
+      localStorage.removeItem(LEGACY_KEY);
+      return parsed;
+    }
+  } catch { /* fall through */ }
+  return [];
 }
 
 function fmtDur(s: number) {
@@ -46,6 +58,7 @@ function fmt(totalSec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 const routineTotal = (r: Routine) => r.phases.reduce((a, p) => a + p.seconds, 0) * r.rounds;
+const routineWork = (r: Routine) => r.phases.filter(p => p.kind !== 'rest').reduce((a, p) => a + p.seconds, 0) * r.rounds;
 
 export default function IntervalsView() {
   const run = useRoutineRunner();
@@ -80,7 +93,7 @@ export default function IntervalsView() {
     if (run.finished) {
       stationChime();
       vibrate([120, 80, 120, 80, 300]);
-      if (run.routine) saveSession({ duration: routineTotal(run.routine), type: 'interval', preset: run.routine.name });
+      if (run.routine) saveSession({ duration: routineWork(run.routine), type: 'interval', preset: run.routine.name });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.finished]);
@@ -201,7 +214,7 @@ export default function IntervalsView() {
                       <div key={`${r}-${pIdx}`} className="flex items-center gap-1.5">
                         <div className={cn(
                           'label-wall text-[9px] px-2 py-1 rounded border transition-colors',
-                          current ? 'border-[color:var(--color-signal)] text-ink bg-[rgba(232,73,15,0.12)]'
+                          current ? 'border-[color:var(--color-signal)] text-ink bg-[rgb(var(--signal-rgb) / 0.12)]'
                                   : done ? 'border-transparent text-ink-faint line-through' : 'border-rule text-ink-soft'
                         )}>
                           {p.name} {fmtDur(p.seconds)}

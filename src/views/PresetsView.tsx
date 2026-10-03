@@ -32,8 +32,8 @@ const IconMap: Record<string, React.ElementType> = {
   Coffee, TreePine, Zap, Brain, Flame, Moon, BookOpen, PenLine, Music
 };
 
-const KEY = 'platform.presets.v1';
-const LEGACY_KEY = 'obsidian_custom_presets';
+const KEY = 'timer.presets.v1';
+const LEGACY_KEYS = ['platform.presets.v1', 'obsidian_custom_presets'];
 
 export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
   const [customPresets, setCustomPresets] = useState<Preset[]>([]);
@@ -49,12 +49,13 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
     try {
       const saved = localStorage.getItem(KEY);
       if (saved) { setCustomPresets(JSON.parse(saved)); return; }
-      const legacy = localStorage.getItem(LEGACY_KEY);
-      if (legacy) {
-        const parsed = JSON.parse(legacy).map((p: any) => ({
+      const legacyKey = LEGACY_KEYS.find(k => localStorage.getItem(k));
+      if (legacyKey) {
+        const raw = JSON.parse(localStorage.getItem(legacyKey)!);
+        const parsed = raw.map((p: any) => ({
           id: p.id, name: p.name, minutes: p.minutes,
           description: p.description || '', icon: p.icon || 'Brain',
-          accent: p.color === 'primary' || p.color === 'orange' || p.color === 'rose',
+          accent: 'accent' in p ? p.accent : (p.color === 'primary' || p.color === 'orange' || p.color === 'rose'),
         }));
         setCustomPresets(parsed);
         localStorage.setItem(KEY, JSON.stringify(parsed));
@@ -122,7 +123,7 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
               <div className="flex items-start justify-between mb-5">
                 <div className={cn(
                   'w-11 h-11 rounded-md flex items-center justify-center',
-                  preset.accent ? 'bg-[rgba(232,73,15,0.12)] text-[color:var(--color-signal)]' : 'bg-[rgba(38,33,16,0.07)] text-ink-soft'
+                  preset.accent ? 'bg-[rgb(var(--signal-rgb) / 0.12)] text-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb) / 0.07)] text-ink-soft'
                 )}>
                   <Icon size={20} strokeWidth={1.8} />
                 </div>
