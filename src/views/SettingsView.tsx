@@ -1,185 +1,200 @@
 import { useState, useEffect } from 'react';
-import { Palette, CheckCircle2, RefreshCcw, AlertTriangle, X } from 'lucide-react';
+import { Palette, CheckCircle2, RefreshCcw, AlertTriangle, X, Volume2, Gauge, Keyboard, MoonStar } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { vibrate } from '../lib/utils';
-
-const THEMES = [
-  { name: 'Cyan Pulse', primary: '#6dddff', container: '#00d2fd', onContainer: '#004352' },
-  { name: 'Neon Green', primary: '#2ff801', container: '#2be800', onContainer: '#003300' },
-  { name: 'Cyber Purple', primary: '#d946ef', container: '#c026d3', onContainer: '#4a044e' },
-  { name: 'Sunset Orange', primary: '#fb923c', container: '#f97316', onContainer: '#431407' },
-  { name: 'Crimson Red', primary: '#fb7185', container: '#e11d48', onContainer: '#4c0519' },
-  { name: 'Golden Yellow', primary: '#fde047', container: '#eab308', onContainer: '#422006' },
-];
+import { vibrate, cn } from '../lib/utils';
+import { clearSessions } from '../lib/stats';
+import { ACCENTS, useSettings, updateSettings } from '../lib/settings';
+import { stationChime, flapTick } from '../lib/sound';
+import { KeyButton } from '../components/KeyButton';
 
 export default function SettingsView() {
-  const [activeTheme, setActiveTheme] = useState(THEMES[0].name);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const settings = useSettings();
+  const [confirm, setConfirm] = useState(false);
+  const [toast, setToast] = useState(false);
 
+  /* esc backs out of the wipe confirmation */
   useEffect(() => {
-    const savedTheme = localStorage.getItem('obsidian_pulse_theme');
-    if (savedTheme) {
-      setActiveTheme(savedTheme);
-      applyTheme(THEMES.find(t => t.name === savedTheme) || THEMES[0]);
-    }
-  }, []);
+    if (!confirm) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setConfirm(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [confirm]);
 
-  const applyTheme = (theme: typeof THEMES[0]) => {
-    document.documentElement.style.setProperty('--color-primary', theme.primary);
-    document.documentElement.style.setProperty('--color-primary-container', theme.container);
-    document.documentElement.style.setProperty('--color-on-primary-container', theme.onContainer);
-    // Also update secondary to match primary for a unified look, or keep it distinct
-    document.documentElement.style.setProperty('--color-secondary', theme.primary);
-    document.documentElement.style.setProperty('--color-secondary-dim', theme.container);
-  };
-
-  const handleSelectTheme = (theme: typeof THEMES[0]) => {
-    vibrate(30);
-    setActiveTheme(theme.name);
-    localStorage.setItem('obsidian_pulse_theme', theme.name);
-    applyTheme(theme);
-  };
-
-  const confirmResetData = () => {
-    localStorage.removeItem('obsidian_pulse_sessions');
+  const clearAll = () => {
+    clearSessions();
     vibrate([50, 50, 50]);
-    setShowConfirmModal(false);
-    setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 3000);
+    setConfirm(false);
+    setToast(true);
+    setTimeout(() => setToast(false), 2800);
   };
 
-  const resetData = () => {
-    vibrate(20);
-    setShowConfirmModal(true);
-  };
+  const sectionHead = (icon: React.ReactNode, title: string) => (
+    <div className="flex items-center gap-3 mb-5">
+      <span className="text-[color:var(--color-signal)]">{icon}</span>
+      <h2 className="font-display font-bold text-xl text-ink uppercase leading-none">{title}</h2>
+    </div>
+  );
 
   return (
-    <div className="flex-1 px-6 pt-4 w-full max-w-3xl mx-auto relative md:pb-8">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-12 mt-8 md:mt-0"
-      >
-        <h1 className="font-headline text-4xl font-bold tracking-tight mb-2 text-on-surface">Settings</h1>
-        <p className="text-on-surface-variant text-sm font-label tracking-wider uppercase">Customize your experience</p>
-      </motion.div>
+    <div className="flex-1 w-full max-w-3xl mx-auto px-4 md:px-8 py-6">
+      <div className="mb-10">
+        <div className="label-wall text-[10px] mb-1">Workbench</div>
+        <h1 className="font-display text-4xl md:text-5xl font-bold text-ink uppercase tracking-tight leading-none">
+          Settings
+        </h1>
+      </div>
 
-      <motion.section 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-12"
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <Palette className="text-primary" size={24} />
-          <h2 className="text-xl font-bold font-headline text-on-surface">Theme Colors</h2>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {THEMES.map((theme, i) => (
+      {/* signal colour */}
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
+        {sectionHead(<Palette size={20} />, 'Signal colour')}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {ACCENTS.map((t, i) => (
             <motion.button
-              key={theme.name}
-              initial={{ opacity: 0, scale: 0.9 }}
+              key={t.name}
+              initial={{ opacity: 0, scale: 0.92 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 + i * 0.05 }}
-              onClick={() => handleSelectTheme(theme)}
-              className={`p-4 rounded-xl border transition-all flex flex-col items-center gap-3 ${
-                activeTheme === theme.name 
-                  ? 'bg-surface-container-highest border-primary' 
-                  : 'bg-surface-container-low border-white/5 hover:border-white/20'
-              }`}
+              transition={{ delay: 0.06 + i * 0.04 }}
+              onClick={() => { vibrate(20); flapTick(); updateSettings({ accent: t.name }); }}
+              className={cn(
+                'panel-wall p-4 flex flex-col items-center gap-3 transition-transform active:scale-95',
+                settings.accent === t.name && 'outline-2 outline-[color:var(--color-signal)]'
+              )}
+              style={settings.accent === t.name ? { outlineColor: t.signal } : undefined}
             >
-              <div 
-                className="w-12 h-12 rounded-full shadow-lg flex items-center justify-center"
-                style={{ backgroundColor: theme.primary }}
+              <div
+                className="w-10 h-10 rounded-md flex items-center justify-center"
+                style={{ background: t.signal, boxShadow: `0 3px 0 ${t.deep}` }}
               >
-                {activeTheme === theme.name && <CheckCircle2 size={20} style={{ color: theme.onContainer }} />}
+                {settings.accent === t.name && <CheckCircle2 size={18} color="#FFEDE3" />}
               </div>
-              <span className="font-label text-xs uppercase tracking-widest text-on-surface-variant">
-                {theme.name}
-              </span>
+              <span className="label-wall text-[10px]">{t.name}</span>
             </motion.button>
           ))}
         </div>
       </motion.section>
 
-      <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        <div className="flex items-center gap-3 mb-6">
-          <RefreshCcw className="text-error" size={24} />
-          <h2 className="text-xl font-bold font-headline text-on-surface">Data Management</h2>
-        </div>
-        
-        <div className="bg-surface-container-low p-6 rounded-xl border border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h3 className="font-headline font-bold text-on-surface">Clear Session History</h3>
-            <p className="text-sm text-on-surface-variant mt-1">This will permanently delete all your focus stats and history.</p>
-          </div>
-          <button 
-            onClick={resetData}
-            className="px-6 py-3 bg-error/10 text-error hover:bg-error/20 rounded-lg font-label text-xs uppercase tracking-widest font-bold transition-colors"
-          >
-            Clear Data
-          </button>
+      {/* behaviour */}
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
+        {sectionHead(<Gauge size={20} />, 'Behaviour')}
+        <div className="panel-wall divide-y divide-[rgb(var(--ink-rgb) / 0.1)]">
+          {[
+            {
+              icon: <Volume2 size={17} />,
+              title: 'Board sounds',
+              desc: 'Relay clicks, landing thunks, and the station chime.',
+              on: settings.sound,
+              toggle: () => { updateSettings({ sound: !settings.sound }); if (!settings.sound) setTimeout(stationChime, 120); },
+            },
+            {
+              icon: <Gauge size={17} />,
+              title: 'Full motion',
+              desc: 'Flap flips, cascades and ambient motion. Off for reduced motion.',
+              on: settings.motion === 'full',
+              toggle: () => updateSettings({ motion: settings.motion === 'full' ? 'reduced' : 'full' }),
+            },
+            {
+              icon: <MoonStar size={17} />,
+              title: 'Night board',
+              desc: 'Graphite wall and dim ink for low light. Off keeps the plaster room.',
+              on: settings.theme === 'night',
+              toggle: () => updateSettings({ theme: settings.theme === 'night' ? 'day' : 'night' }),
+            },
+          ].map(row => (
+            <div key={row.title} className="flex items-center justify-between p-5 gap-4">
+              <div className="flex items-center gap-4">
+                <span className="text-ink-soft">{row.icon}</span>
+                <div>
+                  <div className="font-display font-semibold text-ink text-base leading-tight">{row.title}</div>
+                  <div className="text-ink-soft text-sm font-body">{row.desc}</div>
+                </div>
+              </div>
+              <button
+                onClick={() => { vibrate(15); row.toggle(); }}
+                className={cn(
+                  'w-14 h-8 rounded-full relative transition-colors shrink-0',
+                  row.on ? 'bg-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb) / 0.2)]'
+                )}
+                role="switch" aria-checked={row.on}
+              >
+                <motion.span
+                  animate={{ x: row.on ? 26 : 2 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                  className="absolute top-1 w-6 h-6 rounded-full bg-[color:var(--rng-thumb-a)] shadow"
+                />
+              </button>
+            </div>
+          ))}
         </div>
       </motion.section>
 
-      {/* Custom Confirm Modal */}
+      {/* keys */}
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-10">
+        {sectionHead(<Keyboard size={20} />, 'Keys')}
+        <div className="panel-wall p-5 grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-3">
+          {[['Space', 'run / pause'], ['R', 'reset'], ['L', 'lap'], ['F', 'focus mode'], ['Esc', 'exit / close']].map(([k, d]) => (
+            <div key={k} className="flex items-center gap-2.5">
+              <kbd className="key !px-2.5 !py-1.5 text-[10px] !rounded-md pointer-events-none">{k}</kbd>
+              <span className="label-wall text-[9px]">{d}</span>
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* danger */}
+      <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+        {sectionHead(<RefreshCcw size={20} />, 'Data')}
+        <div className="panel-wall p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="font-display font-semibold text-ink text-base">Clear session log</div>
+            <div className="text-ink-soft text-sm font-body">Deletes every recorded session, streak and stat.</div>
+          </div>
+          <KeyButton variant="paper" className="px-5 py-2.5 text-[11px] shrink-0" onClick={() => { vibrate(20); setConfirm(true); }}>
+            Clear log
+          </KeyButton>
+        </div>
+      </motion.section>
+
+      {/* confirm */}
       <AnimatePresence>
-        {showConfirmModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+        {confirm && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+            style={{ background: 'rgba(15,12,6,0.7)', backdropFilter: 'blur(6px)' }}
+            onClick={() => setConfirm(false)}
           >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface-container-highest border border-white/10 p-6 rounded-2xl max-w-sm w-full shadow-2xl"
+            <motion.div
+              initial={{ y: 30, scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: 24, scale: 0.95 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 26 }}
+              className="board p-6 max-w-sm w-full"
+              onClick={e => e.stopPropagation()}
             >
-              <div className="flex items-center gap-4 mb-4 text-error">
-                <AlertTriangle size={32} />
-                <h3 className="text-xl font-bold font-headline">Clear Data?</h3>
+              <div className="flex items-center gap-3 mb-3" style={{ color: 'var(--color-signal-bright)' }}>
+                <AlertTriangle size={26} />
+                <h3 className="font-display font-bold text-xl text-flap-ink uppercase">Clear the log?</h3>
               </div>
-              <p className="text-on-surface-variant text-sm mb-8">
-                This action cannot be undone. All your session history, focus stats, and records will be permanently deleted.
+              <p className="text-flap-dim text-sm font-body mb-6">
+                This can't be undone. Session history, streaks and stats are wiped from this device.
               </p>
-              <div className="flex gap-4 justify-end">
-                <button 
-                  onClick={() => setShowConfirmModal(false)}
-                  className="px-4 py-2 rounded-lg font-label text-xs uppercase tracking-widest font-bold text-on-surface-variant hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={confirmResetData}
-                  className="px-4 py-2 rounded-lg font-label text-xs uppercase tracking-widest font-bold bg-error text-white hover:bg-error/80 transition-colors"
-                >
-                  Delete Everything
-                </button>
+              <div className="flex gap-3 justify-end">
+                <KeyButton className="px-4 py-2.5 text-[11px]" onClick={() => setConfirm(false)}>Keep it</KeyButton>
+                <KeyButton variant="signal" className="px-4 py-2.5 text-[11px]" onClick={clearAll}>Wipe</KeyButton>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Success Toast */}
+      {/* toast */}
       <AnimatePresence>
-        {showSuccessToast && (
-          <motion.div 
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[150] bg-surface-container-highest border border-primary/20 text-on-surface px-6 py-3 rounded-full shadow-lg flex items-center gap-3"
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+            className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[150] board px-5 py-3 flex items-center gap-3"
           >
-            <CheckCircle2 size={18} className="text-primary" />
-            <span className="font-label text-xs uppercase tracking-widest font-bold">Data Cleared Successfully</span>
+            <CheckCircle2 size={16} style={{ color: 'var(--color-signal-bright)' }} />
+            <span className="engraved text-[10px]">Log cleared</span>
           </motion.div>
         )}
       </AnimatePresence>

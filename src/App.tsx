@@ -1,148 +1,164 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { History, Settings, Timer, Clock, SlidersHorizontal, BarChart2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence, MotionConfig } from 'motion/react';
+import { Timer, Watch, Clock, Repeat2, LayoutGrid, BarChart3, Settings } from 'lucide-react';
 import { cn, vibrate } from '@/src/lib/utils';
+import { unlockAudio, flapTick } from '@/src/lib/sound';
+import { applySettings, useSettings } from '@/src/lib/settings';
 import TimerView from './views/TimerView';
 import StopwatchView from './views/StopwatchView';
+import ClockView from './views/ClockView';
+import IntervalsView from './views/IntervalsView';
 import PresetsView from './views/PresetsView';
 import StatsView from './views/StatsView';
 import SettingsView from './views/SettingsView';
+import { BootSequence } from './components/BootSequence';
 
-type View = 'timer' | 'stopwatch' | 'presets' | 'stats' | 'settings';
+type View = 'timer' | 'stopwatch' | 'clock' | 'intervals' | 'presets' | 'stats' | 'settings';
+
+const NAV: { id: View; label: string; icon: React.ReactNode }[] = [
+  { id: 'timer',     label: 'Timer',     icon: <Timer size={19} strokeWidth={2.1} /> },
+  { id: 'stopwatch', label: 'Watch',     icon: <Watch size={19} strokeWidth={2.1} /> },
+  { id: 'clock',     label: 'Clock',     icon: <Clock size={19} strokeWidth={2.1} /> },
+  { id: 'intervals', label: 'Routes',    icon: <Repeat2 size={19} strokeWidth={2.1} /> },
+  { id: 'presets',   label: 'Departures',icon: <LayoutGrid size={19} strokeWidth={2.1} /> },
+  { id: 'stats',     label: 'Ledger',    icon: <BarChart3 size={19} strokeWidth={2.1} /> },
+  { id: 'settings',  label: 'Settings',  icon: <Settings size={19} strokeWidth={2.1} /> },
+];
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<View>('timer');
-  const [timerPreset, setTimerPreset] = useState<number>(25);
-  const [presetName, setPresetName] = useState<string | undefined>(undefined);
-  const [isGlobalFocusMode, setIsGlobalFocusMode] = useState(false);
+  const [view, setView] = useState<View>('timer');
+  const [preset, setPreset] = useState<{ minutes: number; name?: string; n: number }>({ minutes: 25, n: 0 });
+  const [focusMode, setFocusMode] = useState(false);
+  const [booted, setBooted] = useState(false);
+  const settings = useSettings();
 
-  const handleSelectPreset = (minutes: number, name?: string) => {
-    setTimerPreset(minutes);
-    setPresetName(name);
-    setCurrentView('timer');
+  useEffect(() => {
+    applySettings();
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: false });
+    window.addEventListener('keydown', unlock, { once: false });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  const selectPreset = (minutes: number, name?: string) => {
+    setPreset(p => ({ minutes, name, n: p.n + 1 }));
+    setView('timer');
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-on-surface font-body overflow-x-hidden selection:bg-primary selection:text-on-primary-container">
-      {/* Top Logo / Header */}
+    <MotionConfig reducedMotion={settings.motion === 'reduced' ? 'always' : 'user'}>
+    <div className="min-h-screen flex flex-col wall-tex text-ink font-body overflow-x-hidden">
+      {!booted && <BootSequence onDone={() => setBooted(true)} />}
+
+      {/* ---------- header ---------- */}
       <AnimatePresence>
-        {!isGlobalFocusMode && (
-          <motion.header 
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            exit={{ y: -100 }}
-            className="w-full top-0 sticky z-[100] flex justify-center md:justify-start items-center px-6 py-6 pointer-events-none"
+        {!focusMode && (
+          <motion.header
+            initial={{ y: -60, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: -60, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 26 }}
+            className="w-full flex justify-between items-center px-5 md:px-8 pt-5 pb-1 z-40"
           >
-            <div className="flex items-center gap-3 text-primary font-bold tracking-widest uppercase bg-background/50 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/5 pointer-events-auto">
-              <Timer size={20} strokeWidth={2.5} />
-              <span className="text-sm">Timer Stack</span>
+            <div className="flex items-center gap-3">
+              {/* wordmark — a tiny two-flap mark + type */}
+              <div className="flex gap-[3px]">
+                <span className="block w-[13px] h-[18px] rounded-[2px]" style={{ background: 'var(--mark-flap)', boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.4)' }} />
+                <span className="block w-[13px] h-[18px] rounded-[2px]" style={{ background: 'var(--color-signal)', boxShadow: 'inset 0 -2px 0 rgba(0,0,0,0.35)' }} />
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="font-display font-bold text-lg tracking-[0.14em] text-ink">TIMER</span>
+                <span className="label-wall text-[8px]" style={{ letterSpacing: '0.34em' }}>TIME INSTRUMENTS</span>
+              </div>
             </div>
+            <span className="label-wall text-[10px] hidden sm:block" style={{ letterSpacing: '0.28em' }}>
+              EST. YOUR WORKDAY
+            </span>
           </motion.header>
         )}
       </AnimatePresence>
 
-      <div className="flex-1 flex flex-col w-full h-full relative">
-        {/* Main Content Area */}
-        <main className={cn(
-          "flex-1 flex flex-col relative w-full h-full transition-all duration-300",
-          !isGlobalFocusMode && "pb-32"
-        )}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentView}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-              className="flex-1 flex flex-col w-full h-full"
-            >
-              {currentView === 'timer' && (
-                <TimerView 
-                  presetMinutes={timerPreset} 
-                  presetName={presetName} 
-                  onFocusModeChange={setIsGlobalFocusMode}
-                />
-              )}
-              {currentView === 'stopwatch' && <StopwatchView />}
-              {currentView === 'presets' && <PresetsView onSelectPreset={handleSelectPreset} />}
-              {currentView === 'stats' && <StatsView />}
-              {currentView === 'settings' && <SettingsView />}
-            </motion.div>
-          </AnimatePresence>
-        </main>
-      </div>
-
-      {/* Universal Bottom Dock */}
-      <AnimatePresence>
-        {!isGlobalFocusMode && (
-          <motion.nav 
-            initial={{ y: 150 }}
-            animate={{ y: 0 }}
-            exit={{ y: 150 }}
-            className="fixed bottom-6 md:bottom-10 left-0 right-0 mx-auto w-[calc(100%-2rem)] max-w-fit z-[100] bg-background/80 md:bg-surface-container/80 backdrop-blur-2xl border border-white/10 shadow-[0_20px_40px_rgba(0,0,0,0.4)] rounded-3xl"
+      {/* ---------- content ---------- */}
+      <main className={cn('flex-1 flex flex-col w-full relative', !focusMode && 'pb-44')}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={view}
+            initial={{ opacity: 0, y: 20, rotateX: 4 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0 }}
+            exit={{ opacity: 0, y: -14, rotateX: -3 }}
+            transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+            className="flex-1 flex flex-col w-full"
+            style={{ transformOrigin: '50% 0%', perspective: 900 }}
           >
-            <div className="flex items-center justify-between md:justify-center gap-1 md:gap-3 px-3 py-3">
-              <NavItem
-                icon={<Timer size={24} strokeWidth={currentView === 'timer' ? 2 : 1.5} />}
-                label="Timer"
-                isActive={currentView === 'timer'}
-                onClick={() => setCurrentView('timer')}
+            {view === 'timer' && (
+              <TimerView
+                key={preset.n}
+                presetMinutes={preset.minutes}
+                presetName={preset.name}
+                onFocusModeChange={setFocusMode}
               />
-              <NavItem
-                icon={<Clock size={24} strokeWidth={currentView === 'stopwatch' ? 2 : 1.5} />}
-                label="Stopwatch"
-                isActive={currentView === 'stopwatch'}
-                onClick={() => setCurrentView('stopwatch')}
-              />
-              <NavItem
-                icon={<SlidersHorizontal size={24} strokeWidth={currentView === 'presets' ? 2 : 1.5} />}
-                label="Presets"
-                isActive={currentView === 'presets'}
-                onClick={() => setCurrentView('presets')}
-              />
-              <NavItem
-                icon={<BarChart2 size={24} strokeWidth={currentView === 'stats' ? 2 : 1.5} />}
-                label="Stats"
-                isActive={currentView === 'stats'}
-                onClick={() => setCurrentView('stats')}
-              />
-              <div className="w-[1px] h-8 bg-white/10 mx-1 hidden md:block" />
-              <NavItem
-                icon={<Settings size={24} strokeWidth={currentView === 'settings' ? 2 : 1.5} />}
-                label="Settings"
-                isActive={currentView === 'settings'}
-                onClick={() => setCurrentView('settings')}
-              />
+            )}
+            {view === 'stopwatch' && <StopwatchView />}
+            {view === 'clock' && <ClockView />}
+            {view === 'intervals' && <IntervalsView />}
+            {view === 'presets' && <PresetsView onSelectPreset={selectPreset} />}
+            {view === 'stats' && <StatsView />}
+            {view === 'settings' && <SettingsView />}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+
+      {/* ---------- dock ---------- */}
+      <AnimatePresence>
+        {!focusMode && (
+          <motion.nav
+            initial={{ y: 90, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 90, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 26, delay: 0.05 }}
+            className="fixed bottom-5 left-0 right-0 z-[100] flex justify-center px-4"
+          >
+            <div className="board board-screws !rounded-2xl px-2 py-2 flex items-center gap-0.5">
+              {NAV.map((item, i) => {
+                const active = view === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => { if (!active) { vibrate(18); flapTick(0.03); setView(item.id); } }}
+                    className={cn(
+                      'relative flex flex-col items-center justify-center px-3 md:px-4 py-2 rounded-xl transition-colors duration-150',
+                      active ? 'text-[color:var(--color-signal-bright)]' : 'text-flap-dim hover:text-flap-ink'
+                    )}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="dock-pip"
+                        className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-6 h-[3px] rounded-full"
+                        style={{ background: 'var(--color-signal-bright)', boxShadow: '0 0 8px var(--color-signal)' }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+                      />
+                    )}
+                    <motion.span
+                      animate={active ? { y: [0, -2, 0] } : { y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      key={`${item.id}-${active}`}
+                    >
+                      {item.icon}
+                    </motion.span>
+                    <span className="engraved text-[8px] mt-1.5 hidden sm:block" style={{ letterSpacing: '0.16em' }}>
+                      {item.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </motion.nav>
         )}
       </AnimatePresence>
     </div>
-  );
-}
-
-function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode; label: string; isActive: boolean; onClick: () => void }) {
-  const handleClick = () => {
-    vibrate(30);
-    onClick();
-  };
-  return (
-    <button
-      onClick={handleClick}
-      className={cn(
-        "flex flex-col items-center justify-center px-4 py-2 transition-all active:scale-90 duration-200 rounded-xl",
-        isActive ? "text-primary bg-primary/10" : "text-on-surface-variant hover:bg-white/5"
-      )}
-    >
-      {icon}
-      <span className="font-label text-[10px] uppercase tracking-[0.05em] mt-1 font-medium">
-        {label}
-      </span>
-    </button>
+    </MotionConfig>
   );
 }
