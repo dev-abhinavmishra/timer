@@ -58,14 +58,16 @@ export function FlipDigit({
   useEffect(() => {
     if (!leaf) return;
     if (sound) tickSound();
+    // Failsafe only — the commit normally comes from the bottom leaf's
+    // animationend so it fires exactly when the CSS lands, even if delay or
+    // duration changed mid-flight (a boot phase change lengthens both).
     timer.current = setTimeout(() => {
       setShown(leaf.next);
       setLeaf(null);
       if (sound) landSound();
-    }, delay + duration + 60);
+    }, delay + duration + 150);
     return () => { if (timer.current) clearTimeout(timer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaf]);
+  }, [leaf, delay, duration, sound]);
 
   const fsH = size;
   const fsW = width ?? Math.round(size * (square ? 0.72 : 0.64));
@@ -89,11 +91,25 @@ export function FlipDigit({
           chain a fresh flip on landing instead of swapping a live card face. */}
       <div className="flap-half flap-half--top"><span className="flap-glyph">{leaf ? leaf.next : char}</span></div>
       <div className="flap-half flap-half--bot"><span className="flap-glyph">{leaf ? leaf.prev : char}</span></div>
+      {/* Keyed per pair: a chained flip replaces these nodes outright so the
+          leaf animations restart — reusing them would leave the finished
+          animations at their end-state and the new digit would teleport. Two
+          adjacent leaves can never share a pair (prev of one is next of the
+          last), so prev+next is a safe key. */}
       {leaf && (
-        <>
+        <React.Fragment key={leaf.prev + leaf.next}>
           <div className="flap-leaf flap-leaf--top"><span className="flap-glyph">{leaf.prev}</span></div>
-          <div className="flap-leaf flap-leaf--bot"><span className="flap-glyph">{leaf.next}</span></div>
-        </>
+          <div
+            className="flap-leaf flap-leaf--bot"
+            onAnimationEnd={() => {
+              setShown(leaf.next);
+              setLeaf(null);
+              if (sound) landSound();
+            }}
+          >
+            <span className="flap-glyph">{leaf.next}</span>
+          </div>
+        </React.Fragment>
       )}
       <div className="flap-seam" />
     </div>
