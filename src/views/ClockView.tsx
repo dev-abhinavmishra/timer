@@ -27,7 +27,10 @@ function loadAlarms(): Alarm[] {
   return [];
 }
 
-export default function ClockView() {
+export default function ClockView({ active = true, onRequestView }: {
+  active?: boolean;               // false while another view is on screen
+  onRequestView?: () => void;     // ask the shell to surface this view
+}) {
   const now = useNow(1000);
   const vp = useViewport();
   const [alarms, setAlarms] = useState<Alarm[]>(loadAlarms);
@@ -66,13 +69,16 @@ export default function ClockView() {
       vibrate([200, 100, 200, 100, 400]);
       stopRing.current = alarmRing();
       document.title = `● ${(hit.label || 'Alarm').toUpperCase()} — Timer`;
+      // the alarm must be dismissible — pull the app to this view so the
+      // takeover is actually visible (keep-alive views mount once and hide)
+      if (!active) onRequestView?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
 
   /* title + keys while the alarm takeover is up */
   useEffect(() => {
-    if (!firing) return;
+    if (!firing || !active) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Space' || e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); dismiss(); }
       else if (e.key === 's' || e.key === 'S') snooze();
@@ -80,15 +86,15 @@ export default function ClockView() {
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('keydown', onKey); document.title = 'Timer — Time Instruments'; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [firing]);
+  }, [firing, active]);
 
   /* esc closes the add-alarm sheet */
   useEffect(() => {
-    if (!showAdd) return;
+    if (!showAdd || !active) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAdd(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showAdd]);
+  }, [showAdd, active]);
 
   const dismiss = () => {
     stopRing.current?.(); stopRing.current = null;

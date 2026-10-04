@@ -19,10 +19,12 @@ function fmt(totalSec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange }: {
+export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange, active = true, onRequestView }: {
   presetMinutes?: number;
   presetName?: string;
   onFocusModeChange?: (f: boolean) => void;
+  active?: boolean;               // false while another view is on screen
+  onRequestView?: () => void;     // ask the shell to surface this view
 }) {
   const cd = useCountdown();
   const settings = useSettings();
@@ -82,6 +84,12 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   /* ---------- AFK → focus mode ---------- */
   const enterFocus = (v: boolean) => { setFocus(v); onFocusModeChange?.(v); };
   useEffect(() => {
+    // AFK only arms while this view is on screen — a hidden timer must not
+    // steal the app into focus mode where nothing can be seen or undone
+    if (!active) {
+      if (idle.current) { clearTimeout(idle.current); idle.current = null; }
+      return;
+    }
     const wake = () => {
       enterFocus(false);
       if (idle.current) clearTimeout(idle.current);
@@ -101,10 +109,17 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
       if (idle.current) clearTimeout(idle.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
+  }, [running, active]);
+
+  /* the completion takeover pulls the app back to this board if it fires
+     while another view is up — a chime with nobody watching is a missed call */
+  useEffect(() => {
+    if (done && !active) onRequestView?.();
+  }, [done, active, onRequestView]);
 
   /* ---------- keyboard ---------- */
   useEffect(() => {
+    if (!active) return; // keys belong to whichever view is on screen
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;

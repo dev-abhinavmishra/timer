@@ -31,6 +31,17 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [booted, setBooted] = useState(false);
   const settings = useSettings();
+  // views mount on first visit and stay mounted — switching hides rather than
+  // unmounts, so a running countdown, stopwatch laps, ringing alarms and
+  // routine progress all survive navigation
+  const [mounted, setMounted] = useState<Set<View>>(() => new Set<View>(['timer']));
+
+  const go = (id: View) => {
+    if (id === view) return;
+    vibrate(18); flapTick(0.03);
+    setMounted(m => (m.has(id) ? m : new Set(m).add(id)));
+    setView(id);
+  };
 
   useEffect(() => {
     applySettings();
@@ -45,7 +56,7 @@ export default function App() {
 
   const selectPreset = (minutes: number, name?: string) => {
     setPreset(p => ({ minutes, name, n: p.n + 1 }));
-    setView('timer');
+    go('timer');
   };
 
   return (
@@ -82,35 +93,40 @@ export default function App() {
       </AnimatePresence>
 
       {/* ---------- content ---------- */}
+      {/* keep-alive: once visited, each view stays mounted inside a display:none
+          wrapper — running timers, laps and alarms keep their state, and the
+          none→flex swap re-runs the .view-fold-in board-turn on every switch */}
       <main className={cn('flex-1 flex flex-col w-full relative', !focusMode && 'pb-44')}>
-        <AnimatePresence mode="wait">
-          {/* entry fold is CSS (.view-fold-in) — it leaves transform:none at
-              rest, because a persisted transform here would contain-block every
-              position:fixed overlay inside the view; the exit fold stays in
-              framer since a leaving view has no overlays that need the viewport */}
-          <motion.div
-            key={view}
-            initial={false}
-            exit={{ opacity: 0, y: -18, rotateX: -5, transformPerspective: 900 }}
-            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-            className="view-fold-in flex-1 flex flex-col w-full"
-          >
-            {view === 'timer' && (
-              <TimerView
-                key={preset.n}
-                presetMinutes={preset.minutes}
-                presetName={preset.name}
-                onFocusModeChange={setFocusMode}
-              />
-            )}
-            {view === 'stopwatch' && <StopwatchView />}
-            {view === 'clock' && <ClockView />}
-            {view === 'intervals' && <IntervalsView />}
-            {view === 'presets' && <PresetsView onSelectPreset={selectPreset} />}
-            {view === 'stats' && <StatsView />}
-            {view === 'settings' && <SettingsView />}
-          </motion.div>
-        </AnimatePresence>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'timer' ? 'flex' : 'hidden')}>
+          {mounted.has('timer') && (
+            <TimerView
+              key={preset.n}
+              presetMinutes={preset.minutes}
+              presetName={preset.name}
+              onFocusModeChange={setFocusMode}
+              active={view === 'timer'}
+              onRequestView={() => go('timer')}
+            />
+          )}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'stopwatch' ? 'flex' : 'hidden')}>
+          {mounted.has('stopwatch') && <StopwatchView active={view === 'stopwatch'} />}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'clock' ? 'flex' : 'hidden')}>
+          {mounted.has('clock') && <ClockView active={view === 'clock'} onRequestView={() => go('clock')} />}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'intervals' ? 'flex' : 'hidden')}>
+          {mounted.has('intervals') && <IntervalsView active={view === 'intervals'} onRequestView={() => go('intervals')} />}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'presets' ? 'flex' : 'hidden')}>
+          {mounted.has('presets') && <PresetsView onSelectPreset={selectPreset} active={view === 'presets'} />}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'stats' ? 'flex' : 'hidden')}>
+          {mounted.has('stats') && <StatsView />}
+        </div>
+        <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'settings' ? 'flex' : 'hidden')}>
+          {mounted.has('settings') && <SettingsView active={view === 'settings'} />}
+        </div>
       </main>
 
       {/* ---------- dock ---------- */}
@@ -129,7 +145,7 @@ export default function App() {
                 return (
                   <button
                     key={item.id}
-                    onClick={() => { if (!active) { vibrate(18); flapTick(0.03); setView(item.id); } }}
+                    onClick={() => go(item.id)}
                     className={cn(
                       'relative flex flex-col items-center justify-center px-3 md:px-4 py-2 rounded-xl transition-colors duration-150',
                       active ? 'text-[color:var(--color-signal-bright)]' : 'text-flap-dim hover:text-flap-ink'

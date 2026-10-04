@@ -7,18 +7,18 @@ import { ACCENTS, useSettings, updateSettings } from '../lib/settings';
 import { stationChime, flapTick } from '../lib/sound';
 import { KeyButton } from '../components/KeyButton';
 
-export default function SettingsView() {
+export default function SettingsView({ active = true }: { active?: boolean }) {
   const settings = useSettings();
   const [confirm, setConfirm] = useState(false);
   const [toast, setToast] = useState(false);
 
   /* esc backs out of the wipe confirmation */
   useEffect(() => {
-    if (!confirm) return;
+    if (!confirm || !active) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setConfirm(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [confirm]);
+  }, [confirm, active]);
 
   const clearAll = () => {
     clearSessions();

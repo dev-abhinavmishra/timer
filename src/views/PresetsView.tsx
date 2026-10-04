@@ -35,7 +35,7 @@ const IconMap: Record<string, React.ElementType> = {
 const KEY = 'timer.presets.v1';
 const LEGACY_KEYS = ['platform.presets.v1', 'obsidian_custom_presets'];
 
-export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
+export default function PresetsView({ onSelectPreset, active = true }: PresetsViewProps & { active?: boolean }) {
   const [customPresets, setCustomPresets] = useState<Preset[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -47,11 +47,11 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
 
   /* esc closes the new-departure sheet */
   useEffect(() => {
-    if (!showAddModal) return;
+    if (!showAddModal || !active) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowAddModal(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showAddModal]);
+  }, [showAddModal, active]);
 
   useEffect(() => {
     try {
