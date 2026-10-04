@@ -29,7 +29,7 @@ function fmtFull(ms: number) {
   return `${fmtMs(ms)}.${fmtCs(ms)}`;
 }
 
-export default function StopwatchView() {
+export default function StopwatchView({ active = true }: { active?: boolean }) {
   const sw = useStopwatch();
   const vp = useViewport();
   const [laps, setLaps] = useState<Lap[]>([]);
@@ -43,6 +43,7 @@ export default function StopwatchView() {
 
   /* keyboard: space toggle, L lap, R reset */
   useEffect(() => {
+    if (!active) return; // keys belong to whichever view is on screen
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;

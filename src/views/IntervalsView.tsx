@@ -60,7 +60,10 @@ function fmt(totalSec: number) {
 const routineTotal = (r: Routine) => r.phases.reduce((a, p) => a + p.seconds, 0) * r.rounds;
 const routineWork = (r: Routine) => r.phases.filter(p => p.kind !== 'rest').reduce((a, p) => a + p.seconds, 0) * r.rounds;
 
-export default function IntervalsView() {
+export default function IntervalsView({ active = true, onRequestView }: {
+  active?: boolean;               // false while another view is on screen
+  onRequestView?: () => void;     // ask the shell to surface this view
+}) {
   const run = useRoutineRunner();
   const vp = useViewport();
   const [custom, setCustom] = useState<Routine[]>(loadRoutines);
@@ -96,6 +99,8 @@ export default function IntervalsView() {
       stationChime();
       vibrate([120, 80, 120, 80, 300]);
       if (run.routine) saveSession({ duration: routineWork(run.routine), type: 'interval', preset: run.routine.name });
+      // pull the app back to the board so ROUTE COMPLETE is actually seen
+      if (!active) onRequestView?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.finished]);
@@ -112,6 +117,7 @@ export default function IntervalsView() {
 
   /* keyboard */
   useEffect(() => {
+    if (!active) return; // keys belong to whichever view is on screen
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
