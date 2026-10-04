@@ -38,6 +38,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const [thenBreak, setThenBreak] = useState(0);
   const [isBreak, setIsBreak] = useState(false);
   const [focus, setFocus] = useState(false);
+  const [ringIn, setRingIn] = useState(false); // edge ring draws itself once on focus entry
   const [customOpen, setCustomOpen] = useState(false);
   const [customMin, setCustomMin] = useState(25);
   const [done, setDone] = useState<null | 'focus' | 'break'>(null);
@@ -91,7 +92,12 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   }, [cd.secondsLeft, running, active]);
 
   /* ---------- AFK → focus mode ---------- */
-  const enterFocus = (v: boolean) => { setFocus(v); onFocusModeChange?.(v); };
+  const enterFocus = (v: boolean) => {
+    setFocus(v); onFocusModeChange?.(v);
+    // next frame: dasharray grows 0→len so the ring wipes once around the
+    // edge on entry, then keeps draining with the countdown
+    if (v) { setRingIn(false); setTimeout(() => setRingIn(true), 70); }
+  };
   useEffect(() => {
     // AFK only arms while this view is on screen — a hidden timer must not
     // steal the app into focus mode where nothing can be seen or undone
@@ -102,7 +108,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     const wake = () => {
       enterFocus(false);
       if (idle.current) clearTimeout(idle.current);
-      if (running) idle.current = setTimeout(() => enterFocus(true), 12000);
+      if (running) idle.current = setTimeout(() => enterFocus(true), 10000);
     };
     const opts: AddEventListenerOptions = { passive: true };
     window.addEventListener('mousemove', wake, opts);
@@ -112,7 +118,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     // Arm the AFK timer on (re)run, but don't exit focus here — that only
     // happens on real user input (running flips mid-takeover otherwise).
     if (idle.current) clearTimeout(idle.current);
-    if (running) idle.current = setTimeout(() => enterFocus(true), 12000);
+    if (running) idle.current = setTimeout(() => enterFocus(true), 10000);
     return () => {
       ['mousemove', 'keydown', 'pointerdown', 'wheel'].forEach(e => window.removeEventListener(e, wake));
       if (idle.current) clearTimeout(idle.current);
@@ -416,6 +422,40 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
               className="absolute inset-0 pointer-events-none"
               style={{ background: 'radial-gradient(60% 45% at 50% 42%, var(--color-signal), transparent 70%)', opacity: 0.08 }}
             />
+            {/* edge progress ring — remaining time drains clockwise around
+                the screen edge (the original focus frame). On entry it wipes
+                once around the border; after that the dasharray transition
+                glides the drain between second ticks instead of stepping. */}
+            {(() => {
+              const inset = 13;
+              const w = Math.max(0, vp.w - inset * 2);
+              const h = Math.max(0, vp.h - inset * 2);
+              const r = 10;
+              const P = 2 * (w + h) - 8 * r + 2 * Math.PI * r;
+              const frac = hasTime ? Math.min(1, Math.max(0, cd.progress)) : 0;
+              const len = (1 - frac) * P;
+              const dash = ringIn ? `${len} ${P}` : `0 ${P}`;
+              return (
+                <motion.svg
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5, delay: 0.15 }}
+                  className="absolute inset-0 pointer-events-none"
+                  width={vp.w}
+                  height={vp.h}
+                >
+                  <rect x={inset} y={inset} width={w} height={h} rx={r}
+                    fill="none" stroke="rgba(242,233,207,0.09)" strokeWidth={2} />
+                  <rect x={inset} y={inset} width={w} height={h} rx={r}
+                    fill="none" stroke="var(--color-signal-bright)" strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeDasharray={dash}
+                    style={{ transition: 'stroke-dasharray 1s linear', filter: 'drop-shadow(0 0 6px var(--color-signal))' }}
+                  />
+                </motion.svg>
+              );
+            })()}
             <motion.div
               initial={{ scale: 0.94, y: 30 }}
               animate={{ scale: 1, y: 0 }}
