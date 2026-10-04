@@ -335,6 +335,19 @@ html[data-theme='night'] .board-inset { background: #0A0B0F; }
   .flap-colon--live i { animation: colon-beat 1s steps(1, end) infinite; }
   @keyframes colon-beat { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.28; } }
 
+  /* view board-turn — CSS-driven so the transform exists only while the
+     animation runs. A transform that persists on the view wrapper makes it a
+     containing block for every position:fixed overlay inside the view
+     (modals, takeovers, toasts anchor to the content box, not the viewport). */
+  @keyframes view-fold-in {
+    from { opacity: 0; transform: perspective(900px) translateY(26px) rotateX(7deg); }
+    to   { opacity: 1; transform: none; }
+  }
+  .view-fold-in {
+    animation: view-fold-in 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    transform-origin: 50% 0;
+  }
+
   /* rolling digit strip (centiseconds — too fast to flap) */
   .roll {
     display: inline-block;
@@ -525,7 +538,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .flap--flipping .flap-leaf--top, .flap--flipping .flap-leaf--bot,
-  .board::before, .board-label { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .board::before, .board-label, .view-fold-in { animation-duration: 1ms !important; animation-delay: 0ms !important; }
   .flap-colon--live i { animation: none; }
 }
 html[data-motion="reduced"] .flap--flipping .flap-leaf--top,

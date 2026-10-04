@@ -84,14 +84,16 @@ export default function App() {
       {/* ---------- content ---------- */}
       <main className={cn('flex-1 flex flex-col w-full relative', !focusMode && 'pb-44')}>
         <AnimatePresence mode="wait">
+          {/* entry fold is CSS (.view-fold-in) — it leaves transform:none at
+              rest, because a persisted transform here would contain-block every
+              position:fixed overlay inside the view; the exit fold stays in
+              framer since a leaving view has no overlays that need the viewport */}
           <motion.div
             key={view}
-            initial={{ opacity: 0, y: 26, rotateX: 7, transformPerspective: 900 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0, transformPerspective: 900 }}
+            initial={false}
             exit={{ opacity: 0, y: -18, rotateX: -5, transformPerspective: 900 }}
             transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
-            className="flex-1 flex flex-col w-full"
-            style={{ transformOrigin: '50% 0%' }}
+            className="view-fold-in flex-1 flex flex-col w-full"
           >
             {view === 'timer' && (
               <TimerView
