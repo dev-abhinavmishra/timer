@@ -157,7 +157,9 @@ export default function StatsView() {
         </>
       )}
 
-      {/* log */}
+      {/* log — only once something is on the board */}
+      {stats.allSessions.length > 0 && (
+      <>
       <div className="flex items-end justify-between mb-5">
         <div className="font-display text-2xl font-bold text-ink uppercase leading-none">
           {showAll ? 'Full log' : 'Recent runs'}
@@ -206,6 +208,8 @@ export default function StatsView() {
           )}
         </AnimatePresence>
       </div>
+      </>
+      )}
     </div>
   );
 }
