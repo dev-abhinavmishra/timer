@@ -103,9 +103,10 @@ export function RotaryDial({
             strokeWidth={t.major ? 2.4 : 1.2}
             strokeLinecap="round"
             opacity={i <= minutes ? 0.9 : 0.5}
+            style={{ transition: 'stroke 0.25s ease, opacity 0.25s ease' }}
           />
         ))}
-        {/* progress arc */}
+        {/* progress arc — chases smoothly when the value jumps (chips, presets) */}
         <circle
           cx={cx} cy={cy} r={arcR} fill="none"
           stroke="var(--color-signal)" strokeWidth="7" strokeLinecap="round"
@@ -113,13 +114,16 @@ export function RotaryDial({
           strokeDashoffset={arcLen * (1 - frac)}
           transform={`rotate(-90 ${cx} ${cy})`}
           opacity={0.9}
-          style={{ filter: 'drop-shadow(0 0 6px rgba(232,73,15,0.45))' }}
+          style={{
+            filter: 'drop-shadow(0 0 6px rgba(232,73,15,0.45))',
+            transition: 'stroke-dashoffset 0.3s cubic-bezier(0.3, 0.9, 0.3, 1)',
+          }}
         />
         {/* track under arc */}
         <circle cx={cx} cy={cy} r={arcR} fill="none" stroke="rgb(var(--ink-rgb) / 0.14)" strokeWidth="7" style={{ mixBlendMode: 'var(--dial-blend, multiply)' as React.CSSProperties['mixBlendMode'] }} />
-        {/* handle */}
+        {/* handle — CSS transform so it glides to jumps instead of teleporting */}
         {minutes > 0 && (
-          <g transform={`translate(${hx} ${hy})`}>
+          <g style={{ transform: `translate(${hx}px, ${hy}px)`, transition: 'transform 0.3s cubic-bezier(0.3, 0.9, 0.3, 1)' }}>
             <circle r="11" fill="var(--color-signal)" stroke="#FFEDE3" strokeWidth="2"
               style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }} />
             <line x1="0" y1="0" x2="0" y2="-7" stroke="#FFEDE3" strokeWidth="2.4" strokeLinecap="round" />

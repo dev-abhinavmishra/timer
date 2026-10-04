@@ -222,12 +222,11 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
             <div className="flex items-center justify-center py-2">
               <FlipRow text={dispStr} size={flipSize} live={running} accent={isBreak} />
             </div>
-            {/* progress tape along the board floor */}
+            {/* progress tape along the board floor — glides between second ticks */}
             <div className="mt-4 h-[3px] rounded-full" style={{ background: 'rgba(242,233,207,0.08)' }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: 'var(--color-signal-bright)', width: `${(hasTime ? cd.progress : 0) * 100}%` }}
-                transition={{ duration: 0.15, ease: 'linear' }}
+              <div
+                className="h-full rounded-full origin-left"
+                style={{ background: 'var(--color-signal-bright)', transform: `scaleX(${hasTime ? cd.progress : 0})`, transition: 'transform 0.3s linear' }}
               />
             </div>
             <div className="mt-3 flex justify-between items-baseline px-0.5">

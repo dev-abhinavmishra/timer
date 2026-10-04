@@ -126,6 +126,7 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
                 hidden: { opacity: 0, y: 16 },
                 visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 24 } },
               }}
+              whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
               className="panel-wall p-5 flex flex-col relative group"
             >
               <div className="flex items-start justify-between mb-5">
@@ -172,6 +173,8 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
             hidden: { opacity: 0, y: 16 },
             visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 24 } },
           }}
+          whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => { vibrate(20); setShowAddModal(true); }}
           className="flex flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-rule p-6 min-h-[230px] hover:border-ink transition-colors"
         >
