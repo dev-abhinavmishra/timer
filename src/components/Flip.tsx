@@ -39,26 +39,33 @@ export function FlipDigit({
   char, size = 56, width, delay = 0, duration = 280,
   accent = false, quiet = false, sound = true, square = false, flipIn = false,
 }: FlipDigitProps) {
-  const [display, setDisplay] = useState(flipIn ? ' ' : char);
-  // flipIn: seed the leaf at mount so the first paint already shows the blank
-  // card mid-fold — seeding it in the effect instead would flash the fully
-  // formed glyph for one frame before the cascade starts
-  const [leaf, setLeaf] = useState<{ prev: string } | null>(flipIn ? { prev: ' ' } : null);
+  // `shown` is the committed glyph at rest; `leaf` is the card pair mid-flight,
+  // carrying its own {prev → next} so a retarget never morphs a live card face.
+  const [shown, setShown] = useState(flipIn ? ' ' : char);
+  const [leaf, setLeaf] = useState<{ prev: string; next: string } | null>(
+    flipIn ? { prev: ' ', next: char } : null,
+  );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Seed the fold during render, not in an effect: an effect-seeded leaf leaves
+  // one painted frame with `char` on both static halves before the leaves exist
+  // — the digit flashes the new number, snaps back, then flips. Seeded here,
+  // React re-renders before paint and the flash never reaches the screen.
+  if (char !== shown && leaf === null) {
+    setLeaf({ prev: shown, next: char });
+  }
+
   useEffect(() => {
-    if (char === display) return;
+    if (!leaf) return;
     if (sound) tickSound();
-    setLeaf({ prev: display });
-    if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      setDisplay(char);
+      setShown(leaf.next);
       setLeaf(null);
       if (sound) landSound();
     }, delay + duration + 60);
     return () => { if (timer.current) clearTimeout(timer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [char]);
+  }, [leaf]);
 
   const fsH = size;
   const fsW = width ?? Math.round(size * (square ? 0.72 : 0.64));
@@ -74,17 +81,18 @@ export function FlipDigit({
     <div
       className={cn('flap', leaf && 'flap--flipping', accent && 'flap--accent', quiet && 'flap--quiet')}
       style={style}
-      aria-label={display}
+      aria-label={shown}
     >
-      {/* static halves show the incoming glyph; the leaves cover them during the fold.
-          The resting bottom card must keep the OUTGOING glyph until the top leaf has
-          folded past the hinge — otherwise the digit reads half-new before the flip lands */}
-      <div className="flap-half flap-half--top"><span className="flap-glyph">{char}</span></div>
+      {/* During a flip the static halves show THIS leaf's pair — the top reveals
+          leaf.next only as the folding leaf uncovers it, the bottom holds leaf.prev
+          until the new card lands. Retargets mid-flight keep the old pair and
+          chain a fresh flip on landing instead of swapping a live card face. */}
+      <div className="flap-half flap-half--top"><span className="flap-glyph">{leaf ? leaf.next : char}</span></div>
       <div className="flap-half flap-half--bot"><span className="flap-glyph">{leaf ? leaf.prev : char}</span></div>
       {leaf && (
         <>
           <div className="flap-leaf flap-leaf--top"><span className="flap-glyph">{leaf.prev}</span></div>
-          <div className="flap-leaf flap-leaf--bot"><span className="flap-glyph">{char}</span></div>
+          <div className="flap-leaf flap-leaf--bot"><span className="flap-glyph">{leaf.next}</span></div>
         </>
       )}
       <div className="flap-seam" />
