@@ -111,15 +111,17 @@ export default function IntervalsView({ active = true, onRequestView, onTakeover
     onTakeover?.(run.finished);
   }, [run.finished, onTakeover]);
 
-  /* per-second tick sound while running */
+  /* per-second tick sound while running — only while this view is on screen,
+     same policy as the countdown (phase flaps + the finish chime still
+     announce from hidden) */
   const lastSec = useRef(0);
   const secsLeft = Math.ceil(run.remainingMs / 1000);
   useEffect(() => {
     if (run.running && secsLeft !== lastSec.current) {
       lastSec.current = secsLeft;
-      secondTick();
+      if (active) secondTick();
     }
-  }, [secsLeft, run.running]);
+  }, [secsLeft, run.running, active]);
 
   /* keyboard */
   useEffect(() => {
