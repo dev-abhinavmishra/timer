@@ -27,9 +27,10 @@ function loadAlarms(): Alarm[] {
   return [];
 }
 
-export default function ClockView({ active = true, onRequestView }: {
-  active?: boolean;               // false while another view is on screen
-  onRequestView?: () => void;     // ask the shell to surface this view
+export default function ClockView({ active = true, onRequestView, onTakeover }: {
+  active?: boolean;                    // false while another view is on screen
+  onRequestView?: () => void;          // ask the shell to surface this view
+  onTakeover?: (up: boolean) => void;  // report takeover up/down to the shell
 }) {
   const now = useNow(1000);
   const vp = useViewport();
@@ -68,7 +69,6 @@ export default function ClockView({ active = true, onRequestView }: {
       setFiring(hit);
       vibrate([200, 100, 200, 100, 400]);
       stopRing.current = alarmRing();
-      document.title = `● ${(hit.label || 'Alarm').toUpperCase()} — Timer`;
       // the alarm must be dismissible — pull the app to this view so the
       // takeover is actually visible (keep-alive views mount once and hide)
       if (!active) onRequestView?.();
@@ -76,7 +76,22 @@ export default function ClockView({ active = true, onRequestView }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now]);
 
-  /* title + keys while the alarm takeover is up */
+  /* report the alarm takeover so the shell keeps only one on screen —
+     a competing completion must not bury a ringing alarm */
+  useEffect(() => {
+    onTakeover?.(!!firing);
+  }, [firing, onTakeover]);
+
+  /* the ● title lives exactly as long as the ring — keyed only on `firing`,
+     so hiding this view never resets it mid-alarm and the hidden countdown's
+     title writer can't stomp it (it mutes itself while a takeover owns) */
+  useEffect(() => {
+    if (!firing) return;
+    document.title = `● ${(firing.label || 'Alarm').toUpperCase()} — Timer`;
+    return () => { document.title = 'Timer — Time Instruments'; };
+  }, [firing]);
+
+  /* keys while the alarm takeover is up */
   useEffect(() => {
     if (!firing || !active) return;
     const onKey = (e: KeyboardEvent) => {
@@ -84,7 +99,7 @@ export default function ClockView({ active = true, onRequestView }: {
       else if (e.key === 's' || e.key === 'S') snooze();
     };
     window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('keydown', onKey); document.title = 'Timer — Time Instruments'; };
+    return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firing, active]);
 

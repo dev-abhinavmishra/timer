@@ -19,12 +19,14 @@ function fmt(totalSec: number) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange, active = true, onRequestView }: {
+export default function TimerView({ presetMinutes = 25, presetName, onFocusModeChange, active = true, onRequestView, onTakeover, takeoverMuted = false }: {
   presetMinutes?: number;
   presetName?: string;
   onFocusModeChange?: (f: boolean) => void;
-  active?: boolean;               // false while another view is on screen
-  onRequestView?: () => void;     // ask the shell to surface this view
+  active?: boolean;                    // false while another view is on screen
+  onRequestView?: () => void;          // ask the shell to surface this view
+  onTakeover?: (up: boolean) => void;  // report takeover up/down to the shell
+  takeoverMuted?: boolean;             // another view's takeover owns the screen
 }) {
   const cd = useCountdown();
   const settings = useSettings();
@@ -65,11 +67,17 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   }, [presetMinutes, presetName]);
 
   /* ---------- title bar ---------- */
+  // a hidden running countdown must not stomp a takeover's title (e.g. the
+  // ● ALARM label) — muted while another view's takeover owns the screen
+  const mutedRef = useRef(false);
+  mutedRef.current = takeoverMuted;
   useEffect(() => {
-    if (running) document.title = `${fmt(cd.secondsLeft)} — ${isBreak ? 'Break' : (label || 'Focus')}`;
-    else document.title = 'Timer — Time Instruments';
-    return () => { document.title = 'Timer — Time Instruments'; };
-  }, [running, cd.secondsLeft, label, isBreak]);
+    if (!takeoverMuted) {
+      if (running) document.title = `${fmt(cd.secondsLeft)} — ${isBreak ? 'Break' : (label || 'Focus')}`;
+      else document.title = 'Timer — Time Instruments';
+    }
+    return () => { if (!mutedRef.current) document.title = 'Timer — Time Instruments'; };
+  }, [running, cd.secondsLeft, label, isBreak, takeoverMuted]);
 
   /* ---------- per-second tick ---------- */
   const lastSec = useRef(0);
@@ -112,10 +120,15 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   }, [running, active]);
 
   /* the completion takeover pulls the app back to this board if it fires
-     while another view is up — a chime with nobody watching is a missed call */
+     while another view is up — a chime with nobody watching is a missed call.
+     The takeover itself is reported up/down so the shell can keep only one
+     on screen; a competing takeover wins and this one waits for a manual visit */
   useEffect(() => {
     if (done && !active) onRequestView?.();
   }, [done, active, onRequestView]);
+  useEffect(() => {
+    onTakeover?.(!!done);
+  }, [done, onTakeover]);
 
   /* ---------- keyboard ---------- */
   useEffect(() => {
