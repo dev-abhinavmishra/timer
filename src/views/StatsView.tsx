@@ -188,7 +188,7 @@ export default function StatsView() {
                   className="panel-wall px-4 py-3 flex items-center justify-between"
                 >
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-9 h-9 rounded-md bg-[rgb(var(--ink-rgb) / 0.07)] flex items-center justify-center shrink-0">
+                    <div className="w-9 h-9 rounded-md bg-[rgb(var(--ink-rgb)_/_0.07)] flex items-center justify-center shrink-0">
                       <m.icon size={16} className={s.type === 'focus' ? 'text-[color:var(--color-signal)]' : 'text-ink-soft'} />
                     </div>
                     <div className="min-w-0">

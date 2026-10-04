@@ -76,7 +76,7 @@ export default function SettingsView() {
       {/* behaviour */}
       <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-10">
         {sectionHead(<Gauge size={20} />, 'Behaviour')}
-        <div className="panel-wall divide-y divide-[rgb(var(--ink-rgb) / 0.1)]">
+        <div className="panel-wall divide-y divide-[rgb(var(--ink-rgb)_/_0.1)]">
           {[
             {
               icon: <Volume2 size={17} />,
@@ -114,7 +114,7 @@ export default function SettingsView() {
                   'w-14 h-8 rounded-full relative transition-colors shrink-0',
                   row.on
                     ? 'bg-[color:var(--color-signal)]'
-                    : 'bg-[rgb(var(--ink-rgb) / 0.16)] shadow-[inset_0_0_0_1px_rgb(var(--ink-rgb)_/_0.35),inset_0_2px_4px_rgb(var(--ink-rgb)_/_0.2)]'
+                    : 'bg-[rgb(var(--ink-rgb)_/_0.16)] shadow-[inset_0_0_0_1px_rgb(var(--ink-rgb)_/_0.35),inset_0_2px_4px_rgb(var(--ink-rgb)_/_0.2)]'
                 )}
                 role="switch" aria-checked={row.on}
               >

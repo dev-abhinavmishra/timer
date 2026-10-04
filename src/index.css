@@ -524,7 +524,8 @@ body {
 ::selection { background: var(--color-signal); color: #FFEDE3; }
 
 @media (prefers-reduced-motion: reduce) {
-  .flap--flipping .flap-leaf--top, .flap--flipping .flap-leaf--bot { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  .flap--flipping .flap-leaf--top, .flap--flipping .flap-leaf--bot,
+  .board::before, .board-label { animation-duration: 1ms !important; animation-delay: 0ms !important; }
   .flap-colon--live i { animation: none; }
 }
 html[data-motion="reduced"] .flap--flipping .flap-leaf--top,

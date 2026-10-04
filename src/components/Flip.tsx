@@ -40,7 +40,10 @@ export function FlipDigit({
   accent = false, quiet = false, sound = true, square = false, flipIn = false,
 }: FlipDigitProps) {
   const [display, setDisplay] = useState(flipIn ? ' ' : char);
-  const [leaf, setLeaf] = useState<{ prev: string } | null>(null);
+  // flipIn: seed the leaf at mount so the first paint already shows the blank
+  // card mid-fold — seeding it in the effect instead would flash the fully
+  // formed glyph for one frame before the cascade starts
+  const [leaf, setLeaf] = useState<{ prev: string } | null>(flipIn ? { prev: ' ' } : null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
