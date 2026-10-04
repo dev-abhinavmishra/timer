@@ -60,9 +60,10 @@ function fmt(totalSec: number) {
 const routineTotal = (r: Routine) => r.phases.reduce((a, p) => a + p.seconds, 0) * r.rounds;
 const routineWork = (r: Routine) => r.phases.filter(p => p.kind !== 'rest').reduce((a, p) => a + p.seconds, 0) * r.rounds;
 
-export default function IntervalsView({ active = true, onRequestView }: {
-  active?: boolean;               // false while another view is on screen
-  onRequestView?: () => void;     // ask the shell to surface this view
+export default function IntervalsView({ active = true, onRequestView, onTakeover }: {
+  active?: boolean;                    // false while another view is on screen
+  onRequestView?: () => void;          // ask the shell to surface this view
+  onTakeover?: (up: boolean) => void;  // report takeover up/down to the shell
 }) {
   const run = useRoutineRunner();
   const vp = useViewport();
@@ -104,6 +105,11 @@ export default function IntervalsView({ active = true, onRequestView }: {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [run.finished]);
+
+  /* report the completion screen so the shell keeps only one takeover up */
+  useEffect(() => {
+    onTakeover?.(run.finished);
+  }, [run.finished, onTakeover]);
 
   /* per-second tick sound while running */
   const lastSec = useRef(0);

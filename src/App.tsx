@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence, MotionConfig } from 'motion/react';
 import { Timer, Watch, Clock, Repeat2, LayoutGrid, BarChart3, Settings } from 'lucide-react';
 import { cn, vibrate } from '@/src/lib/utils';
@@ -35,6 +35,18 @@ export default function App() {
   // unmounts, so a running countdown, stopwatch laps, ringing alarms and
   // routine progress all survive navigation
   const [mounted, setMounted] = useState<Set<View>>(() => new Set<View>(['timer']));
+  // at most one takeover owns the screen — the first to surface keeps it;
+  // competing ones (e.g. a countdown finishing during a ringing alarm) wait
+  // hidden in their own view, still reachable by manual navigation
+  const [takeoverOwner, setTakeoverOwner] = useState<View | null>(null);
+  const reportTakeover = useCallback((id: View, up: boolean) => {
+    setTakeoverOwner(o => (up ? (o ?? id) : o === id ? null : o));
+  }, []);
+  const requestView = (id: View) => {
+    if (takeoverOwner !== null && takeoverOwner !== id) return; // owned by another takeover
+    setTakeoverOwner(id);
+    go(id);
+  };
 
   const go = (id: View) => {
     if (id === view) return;
@@ -105,7 +117,9 @@ export default function App() {
               presetName={preset.name}
               onFocusModeChange={setFocusMode}
               active={view === 'timer'}
-              onRequestView={() => go('timer')}
+              onRequestView={() => requestView('timer')}
+              onTakeover={up => reportTakeover('timer', up)}
+              takeoverMuted={takeoverOwner !== null && takeoverOwner !== 'timer'}
             />
           )}
         </div>
@@ -113,16 +127,28 @@ export default function App() {
           {mounted.has('stopwatch') && <StopwatchView active={view === 'stopwatch'} />}
         </div>
         <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'clock' ? 'flex' : 'hidden')}>
-          {mounted.has('clock') && <ClockView active={view === 'clock'} onRequestView={() => go('clock')} />}
+          {mounted.has('clock') && (
+            <ClockView
+              active={view === 'clock'}
+              onRequestView={() => requestView('clock')}
+              onTakeover={up => reportTakeover('clock', up)}
+            />
+          )}
         </div>
         <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'intervals' ? 'flex' : 'hidden')}>
-          {mounted.has('intervals') && <IntervalsView active={view === 'intervals'} onRequestView={() => go('intervals')} />}
+          {mounted.has('intervals') && (
+            <IntervalsView
+              active={view === 'intervals'}
+              onRequestView={() => requestView('intervals')}
+              onTakeover={up => reportTakeover('intervals', up)}
+            />
+          )}
         </div>
         <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'presets' ? 'flex' : 'hidden')}>
           {mounted.has('presets') && <PresetsView onSelectPreset={selectPreset} active={view === 'presets'} />}
         </div>
         <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'stats' ? 'flex' : 'hidden')}>
-          {mounted.has('stats') && <StatsView />}
+          {mounted.has('stats') && <StatsView active={view === 'stats'} />}
         </div>
         <div className={cn('view-fold-in flex-1 flex-col w-full', view === 'settings' ? 'flex' : 'hidden')}>
           {mounted.has('settings') && <SettingsView active={view === 'settings'} />}

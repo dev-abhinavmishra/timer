@@ -4,11 +4,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { vibrate } from '../lib/utils';
 import { getStats, getSessions, sessionsCsv, Session } from '../lib/stats';
 
-export default function StatsView() {
+export default function StatsView({ active = true }: { active?: boolean }) {
   const [stats, setStats] = useState(() => getStats());
   const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => { setStats(getStats()); }, []);
+  // keep-alive shell: re-read the ledger every time this view is shown —
+  // sessions logged while it was hidden must appear on the next visit
+  useEffect(() => { if (active) setStats(getStats()); }, [active]);
 
   const fmtDur = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
