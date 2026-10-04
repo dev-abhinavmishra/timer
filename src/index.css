@@ -258,27 +258,82 @@ html[data-theme='night'] .board-inset { background: #0A0B0F; }
     transform: rotateX(90deg);
     z-index: 4;
   }
+  /* shading lives on dedicated overlays driven by opacity — animating
+     `filter` repaints every frame and collapses the fold to a teleport on
+     slower machines; opacity + transform stay on the compositor */
+  .flap-shade {
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* shadow the falling card throws across the bottom half */
+  .flap-shadow-bot {
+    position: absolute;
+    left: 0; right: 0; top: 50%; bottom: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.25) 55%, transparent 100%);
+    opacity: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
   .flap--flipping .flap-leaf--top {
-    animation: flap-fold var(--flip-dur, 280ms) cubic-bezier(0.55, 0.06, 0.68, 0.19) var(--flip-delay, 0ms) forwards;
+    animation: flap-fold calc(var(--flip-dur, 600ms) * 0.45) cubic-bezier(0.55, 0.05, 0.8, 0.4) var(--flip-delay, 0ms) forwards;
   }
   .flap--flipping .flap-leaf--bot {
-    animation: flap-unfold var(--flip-dur, 280ms) cubic-bezier(0.22, 0.9, 0.36, 1.14) calc(var(--flip-delay, 0ms) + var(--flip-fold-share, 0.42) * var(--flip-dur, 280ms)) forwards;
+    animation: flap-unfold calc(var(--flip-dur, 600ms) * 0.56) cubic-bezier(0.3, 0.75, 0.35, 1)
+      calc(var(--flip-delay, 0ms) + var(--flip-dur, 600ms) * 0.44) forwards;
+  }
+  .flap--flipping .flap-leaf--top .flap-shade {
+    animation: flap-fold-shade calc(var(--flip-dur, 600ms) * 0.45) linear var(--flip-delay, 0ms) forwards;
+  }
+  .flap--flipping .flap-leaf--bot .flap-shade {
+    animation: flap-unfold-shade calc(var(--flip-dur, 600ms) * 0.56) linear
+      calc(var(--flip-delay, 0ms) + var(--flip-dur, 600ms) * 0.44) forwards;
+  }
+  .flap--flipping .flap-shadow-bot {
+    animation: flap-cast calc(var(--flip-dur, 600ms) * 0.6) linear var(--flip-delay, 0ms) forwards;
   }
   @keyframes flap-fold {
-    /* leaf darkens as it turns edge-on; small clack rebound when it hits the seam */
-    0%   { transform: rotateX(0deg);    filter: brightness(1); }
-    42%  { transform: rotateX(-90deg);  filter: brightness(0.32); }
-    46%  { transform: rotateX(-83deg);  filter: brightness(0.42); }
-    50%  { transform: rotateX(-90deg);  filter: brightness(0.34); }
-    100% { transform: rotateX(-90deg);  filter: brightness(0.34); }
+    /* the top card falls forward over the hinge — accelerating like a real
+       leaf under gravity — then a small clack rebound off the seam */
+    0%   { transform: rotateX(0deg); }
+    78%  { transform: rotateX(-90deg); }
+    88%  { transform: rotateX(-83deg); }
+    96%  { transform: rotateX(-90deg); }
+    100% { transform: rotateX(-90deg); }
+  }
+  @keyframes flap-fold-shade {
+    /* the falling card goes dark as it turns edge-on */
+    0%   { opacity: 0; }
+    70%  { opacity: 0.62; }
+    88%  { opacity: 0.5; }
+    100% { opacity: 0.55; }
   }
   @keyframes flap-unfold {
-    /* emerges from behind the folded leaf still in shadow, catches light as it lands */
-    0%   { transform: rotateX(90deg);   filter: brightness(0.3); }
-    58%  { transform: rotateX(0deg);    filter: brightness(1.08); }
-    72%  { transform: rotateX(-7deg);   filter: brightness(1); }
-    86%  { transform: rotateX(3deg);    filter: brightness(1); }
-    100% { transform: rotateX(0deg);    filter: brightness(1); }
+    /* new card rises from behind the seam, swings slightly past level,
+       then settles back with a two-beat soft rebound */
+    0%   { transform: rotateX(92deg); }
+    55%  { transform: rotateX(-7deg); }
+    70%  { transform: rotateX(2.5deg); }
+    82%  { transform: rotateX(-1.4deg); }
+    92%  { transform: rotateX(0.7deg); }
+    100% { transform: rotateX(0deg); }
+  }
+  @keyframes flap-unfold-shade {
+    /* shadowed while folded back, catches light as it lands */
+    0%   { opacity: 0.68; }
+    45%  { opacity: 0.25; }
+    55%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  @keyframes flap-cast {
+    /* the cast shadow tracks the fold then lifts as the new card covers it */
+    0%   { opacity: 0; }
+    40%  { opacity: 0.6; }
+    62%  { opacity: 0.55; }
+    90%  { opacity: 0; }
+    100% { opacity: 0; }
   }
   /* hinge pins at the seam */
   .flap::before, .flap::after {

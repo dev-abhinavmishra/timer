@@ -36,7 +36,7 @@ export interface FlipDigitProps {
 }
 
 export function FlipDigit({
-  char, size = 56, width, delay = 0, duration = 280,
+  char, size = 56, width, delay = 0, duration = 600,
   accent = false, quiet = false, sound = true, square = false, flipIn = false,
 }: FlipDigitProps) {
   // `shown` is the committed glyph at rest; `leaf` is the card pair mid-flight,
@@ -98,7 +98,10 @@ export function FlipDigit({
           last), so prev+next is a safe key. */}
       {leaf && (
         <React.Fragment key={leaf.prev + leaf.next}>
-          <div className="flap-leaf flap-leaf--top"><span className="flap-glyph">{leaf.prev}</span></div>
+          <div className="flap-leaf flap-leaf--top">
+            <span className="flap-glyph">{leaf.prev}</span>
+            <i className="flap-shade" />
+          </div>
           <div
             className="flap-leaf flap-leaf--bot"
             onAnimationEnd={() => {
@@ -108,7 +111,9 @@ export function FlipDigit({
             }}
           >
             <span className="flap-glyph">{leaf.next}</span>
+            <i className="flap-shade" />
           </div>
+          <i className="flap-shadow-bot" />
         </React.Fragment>
       )}
       <div className="flap-seam" />
@@ -145,7 +150,7 @@ export interface FlipRowProps {
 
 /* A row of flaps rendering a string — ':' renders as a colon, ' ' as a gap. */
 export function FlipRow({
-  text, size = 56, delayStep = 42, duration = 280,
+  text, size = 56, delayStep = 42, duration = 600,
   accent = false, quiet = false, sound = true, live = false, square = false, flipIn = false,
   className,
 }: FlipRowProps) {

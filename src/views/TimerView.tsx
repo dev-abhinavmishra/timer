@@ -79,15 +79,16 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     return () => { if (!mutedRef.current) document.title = 'Timer — Time Instruments'; };
   }, [running, cd.secondsLeft, label, isBreak, takeoverMuted]);
 
-  /* ---------- per-second tick ---------- */
+  /* ---------- per-second tick (only while this view is on screen; the
+     final three beats + chime still announce from a hidden view) ---------- */
   const lastSec = useRef(0);
   useEffect(() => {
     if (running && cd.secondsLeft !== lastSec.current) {
       lastSec.current = cd.secondsLeft;
       if (cd.secondsLeft <= 3 && cd.secondsLeft > 0) flapLand(0.12); // final beats hit harder
-      else secondTick();
+      else if (active) secondTick();
     }
-  }, [cd.secondsLeft, running]);
+  }, [cd.secondsLeft, running, active]);
 
   /* ---------- AFK → focus mode ---------- */
   const enterFocus = (v: boolean) => { setFocus(v); onFocusModeChange?.(v); };
