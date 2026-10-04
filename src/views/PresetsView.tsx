@@ -132,7 +132,7 @@ export default function PresetsView({ onSelectPreset }: PresetsViewProps) {
               <div className="flex items-start justify-between mb-5">
                 <div className={cn(
                   'w-11 h-11 rounded-md flex items-center justify-center',
-                  preset.accent ? 'bg-[rgb(var(--signal-rgb) / 0.12)] text-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb) / 0.07)] text-ink-soft'
+                  preset.accent ? 'bg-[rgb(var(--signal-rgb)_/_0.12)] text-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb)_/_0.07)] text-ink-soft'
                 )}>
                   <Icon size={20} strokeWidth={1.8} />
                 </div>

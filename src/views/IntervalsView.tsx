@@ -115,8 +115,9 @@ export default function IntervalsView() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.key === 'Escape' && editing) { setEditing(false); return; }
+      if (editing) { if (e.key === 'Escape') setEditing(false); return; }
       if (e.code === 'Space') { e.preventDefault(); if (run.routine) { flashKey('toggle'); run.running ? run.pause() : run.resume(); } }
+      else if (e.key === 'r' || e.key === 'R') { if (run.routine) { flashKey('restart'); run.start(run.routine); } }
       else if (e.key === 'Escape') { if (run.routine) { flashKey('quit'); run.quit(); } }
     };
     window.addEventListener('keydown', onKey);
@@ -217,7 +218,7 @@ export default function IntervalsView() {
                       <div key={`${r}-${pIdx}`} className="flex items-center gap-1.5">
                         <div className={cn(
                           'label-wall text-[9px] px-2 py-1 rounded border transition-colors',
-                          current ? 'border-[color:var(--color-signal)] text-ink bg-[rgb(var(--signal-rgb) / 0.12)]'
+                          current ? 'border-[color:var(--color-signal)] text-ink bg-[rgb(var(--signal-rgb)_/_0.12)]'
                                   : done ? 'border-transparent text-ink-faint line-through' : 'border-rule text-ink-soft'
                         )}>
                           {p.name} {fmtDur(p.seconds)}
