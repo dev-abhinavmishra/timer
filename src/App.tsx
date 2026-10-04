@@ -86,12 +86,12 @@ export default function App() {
         <AnimatePresence mode="wait">
           <motion.div
             key={view}
-            initial={{ opacity: 0, y: 20, rotateX: 4 }}
-            animate={{ opacity: 1, y: 0, rotateX: 0 }}
-            exit={{ opacity: 0, y: -14, rotateX: -3 }}
-            transition={{ duration: 0.24, ease: [0.32, 0.72, 0, 1] }}
+            initial={{ opacity: 0, y: 26, rotateX: 7, transformPerspective: 900 }}
+            animate={{ opacity: 1, y: 0, rotateX: 0, transformPerspective: 900 }}
+            exit={{ opacity: 0, y: -18, rotateX: -5, transformPerspective: 900 }}
+            transition={{ duration: 0.28, ease: [0.32, 0.72, 0, 1] }}
             className="flex-1 flex flex-col w-full"
-            style={{ transformOrigin: '50% 0%', perspective: 900 }}
+            style={{ transformOrigin: '50% 0%' }}
           >
             {view === 'timer' && (
               <TimerView
@@ -141,16 +141,18 @@ export default function App() {
                         transition={{ type: 'spring', stiffness: 500, damping: 32 }}
                       />
                     )}
+                    {/* icon + label hop together when the tab becomes active */}
                     <motion.span
-                      animate={active ? { y: [0, -2, 0] } : { y: 0 }}
-                      transition={{ duration: 0.3 }}
+                      animate={active ? { y: [0, -4, 0], scale: [1, 1.12, 1] } : { y: 0, scale: 1 }}
+                      transition={{ duration: 0.38, ease: 'easeOut' }}
                       key={`${item.id}-${active}`}
+                      className="flex flex-col items-center"
                     >
                       {item.icon}
+                      <span className="engraved text-[8px] mt-1.5 hidden sm:block" style={{ letterSpacing: '0.16em' }}>
+                        {item.label}
+                      </span>
                     </motion.span>
-                    <span className="engraved text-[8px] mt-1.5 hidden sm:block" style={{ letterSpacing: '0.16em' }}>
-                      {item.label}
-                    </span>
                   </button>
                 );
               })}

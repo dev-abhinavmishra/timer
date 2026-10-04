@@ -32,13 +32,14 @@ export interface FlipDigitProps {
   quiet?: boolean;              // dimmed flap ink
   sound?: boolean;              // play relay click/thunk
   square?: boolean;             // letters look better a bit wider
+  flipIn?: boolean;             // mount on the blank card, then flip to char
 }
 
 export function FlipDigit({
   char, size = 56, width, delay = 0, duration = 280,
-  accent = false, quiet = false, sound = true, square = false,
+  accent = false, quiet = false, sound = true, square = false, flipIn = false,
 }: FlipDigitProps) {
-  const [display, setDisplay] = useState(char);
+  const [display, setDisplay] = useState(flipIn ? ' ' : char);
   const [leaf, setLeaf] = useState<{ prev: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -72,9 +73,11 @@ export function FlipDigit({
       style={style}
       aria-label={display}
     >
-      {/* static halves already show the incoming glyph; the leaves cover them during the fold */}
+      {/* static halves show the incoming glyph; the leaves cover them during the fold.
+          The resting bottom card must keep the OUTGOING glyph until the top leaf has
+          folded past the hinge — otherwise the digit reads half-new before the flip lands */}
       <div className="flap-half flap-half--top"><span className="flap-glyph">{char}</span></div>
-      <div className="flap-half flap-half--bot"><span className="flap-glyph">{char}</span></div>
+      <div className="flap-half flap-half--bot"><span className="flap-glyph">{leaf ? leaf.prev : char}</span></div>
       {leaf && (
         <>
           <div className="flap-leaf flap-leaf--top"><span className="flap-glyph">{leaf.prev}</span></div>
@@ -109,13 +112,14 @@ export interface FlipRowProps {
   sound?: boolean;
   live?: boolean;          // colon heartbeat
   square?: boolean;
+  flipIn?: boolean;        // start on the blank card so the row cascades in on mount
   className?: string;
 }
 
 /* A row of flaps rendering a string — ':' renders as a colon, ' ' as a gap. */
 export function FlipRow({
   text, size = 56, delayStep = 42, duration = 280,
-  accent = false, quiet = false, sound = true, live = false, square = false,
+  accent = false, quiet = false, sound = true, live = false, square = false, flipIn = false,
   className,
 }: FlipRowProps) {
   const chars = text.split('');
@@ -137,6 +141,7 @@ export function FlipRow({
             quiet={quiet}
             sound={sound}
             square={square}
+            flipIn={flipIn}
           />
         );
       })}
@@ -149,7 +154,7 @@ export function FlipText({ text, size = 40, className, accent = false, delayStep
   text: string; size?: number; className?: string; accent?: boolean; delayStep?: number; sound?: boolean;
 }) {
   return (
-    <FlipRow text={text.toUpperCase()} size={size} className={className} accent={accent} delayStep={delayStep} sound={sound} square />
+    <FlipRow text={text.toUpperCase()} size={size} className={className} accent={accent} delayStep={delayStep} sound={sound} square flipIn />
   );
 }
 
@@ -201,7 +206,8 @@ export function Board({ children, label, right, className, inset = true, screws 
     <div className={cn('board', screws && 'board-screws', 'px-5 py-4 md:px-7 md:py-5', className)}>
       {(label || right) && (
         <div className="flex items-center justify-between mb-3 px-0.5">
-          <span className="engraved text-[10px] md:text-xs">{label}</span>
+          {/* keyed remount → the engraved title slides in when it changes */}
+          <span key={label} className="engraved text-[10px] md:text-xs board-label">{label}</span>
           {right}
         </div>
       )}

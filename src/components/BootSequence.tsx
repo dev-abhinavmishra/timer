@@ -64,7 +64,8 @@ export function BootSequence({ onDone }: { onDone: () => void }) {
         animate={{ opacity: phase >= 1 ? 0.5 : 0 }}
         className="mt-8"
       >
-        <FlipText text="ALL POINTS CLEAR" size={18} delayStep={40} sound={false} />
+        {/* mounts at the reveal so the flaps visibly snap in from blank */}
+        {phase >= 1 && <FlipText text="ALL POINTS CLEAR" size={18} delayStep={40} sound={false} />}
       </motion.div>
     </motion.div>
   );

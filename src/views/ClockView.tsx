@@ -168,7 +168,16 @@ export default function ClockView() {
                       className={cn('p-2 rounded-md transition-colors', a.on ? 'text-[color:var(--color-signal)]' : 'text-ink-faint')}
                       title={a.on ? 'Enabled' : 'Off'}
                     >
-                      {a.on ? <Bell size={17} /> : <BellOff size={17} />}
+                      {/* bell swings on its hanger when switched on */}
+                      <motion.span
+                        key={String(a.on)}
+                        animate={a.on ? { rotate: [0, -24, 16, -9, 0] } : {}}
+                        transition={{ duration: 0.55, ease: 'easeOut' }}
+                        className="inline-flex"
+                        style={{ transformOrigin: '50% 15%' }}
+                      >
+                        {a.on ? <Bell size={17} /> : <BellOff size={17} />}
+                      </motion.span>
                     </button>
                     <button
                       onClick={() => { vibrate(15); save(alarms.filter(x => x.id !== a.id)); }}
@@ -246,8 +255,18 @@ export default function ClockView() {
               className="absolute inset-0 pointer-events-none"
               style={{ background: 'radial-gradient(55% 40% at 50% 40%, var(--color-signal), transparent 70%)' }}
             />
+            {/* expanding rings — same alarm language as the completion takeover */}
+            {[0, 0.45, 0.9].map((d, i) => (
+              <motion.div
+                key={i}
+                animate={{ scale: [1, 2.4], opacity: [0.3, 0] }}
+                transition={{ duration: 2, delay: d, repeat: Infinity, ease: 'easeOut' }}
+                className="absolute w-56 h-56 rounded-full border-2 pointer-events-none"
+                style={{ borderColor: 'var(--color-signal)' }}
+              />
+            ))}
             <motion.div
-              animate={{ scale: [1, 1.04, 1] }}
+              animate={{ scale: [1, 1.045, 1] }}
               transition={{ duration: 1.4, repeat: Infinity }}
               className="flex flex-col items-center gap-8 z-10"
             >

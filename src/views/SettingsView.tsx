@@ -112,14 +112,17 @@ export default function SettingsView() {
                 onClick={() => { vibrate(15); row.toggle(); }}
                 className={cn(
                   'w-14 h-8 rounded-full relative transition-colors shrink-0',
-                  row.on ? 'bg-[color:var(--color-signal)]' : 'bg-[rgb(var(--ink-rgb) / 0.2)]'
+                  row.on
+                    ? 'bg-[color:var(--color-signal)]'
+                    : 'bg-[rgb(var(--ink-rgb) / 0.16)] shadow-[inset_0_0_0_1px_rgb(var(--ink-rgb)_/_0.35),inset_0_2px_4px_rgb(var(--ink-rgb)_/_0.2)]'
                 )}
                 role="switch" aria-checked={row.on}
               >
                 <motion.span
-                  animate={{ x: row.on ? 26 : 2 }}
+                  initial={false}
+                  animate={{ x: row.on ? 24 : 0 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-                  className="absolute top-1 w-6 h-6 rounded-full bg-[color:var(--rng-thumb-a)] shadow"
+                  className="absolute top-1 left-1 w-6 h-6 rounded-full bg-[color:var(--rng-thumb-a)] shadow"
                 />
               </button>
             </div>

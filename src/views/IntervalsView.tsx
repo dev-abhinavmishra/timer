@@ -66,6 +66,8 @@ export default function IntervalsView() {
   const [custom, setCustom] = useState<Routine[]>(loadRoutines);
   const [editing, setEditing] = useState(false);
   const [flash, setFlash] = useState(0); // increments on phase change → triggers board flash
+  const [keyFlash, setKeyFlash] = useState<string | null>(null);
+  const flashKey = (k: string) => { setKeyFlash(k); setTimeout(() => setKeyFlash(null), 160); };
 
   // editor draft
   const [name, setName] = useState('');
@@ -114,8 +116,8 @@ export default function IntervalsView() {
       const t = e.target as HTMLElement;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
       if (e.key === 'Escape' && editing) { setEditing(false); return; }
-      if (e.code === 'Space') { e.preventDefault(); if (run.routine) run.running ? run.pause() : run.resume(); }
-      else if (e.key === 'Escape') run.routine && run.quit();
+      if (e.code === 'Space') { e.preventDefault(); if (run.routine) { flashKey('toggle'); run.running ? run.pause() : run.resume(); } }
+      else if (e.key === 'Escape') { if (run.routine) { flashKey('quit'); run.quit(); } }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -230,11 +232,11 @@ export default function IntervalsView() {
               </div>
 
               <div className="flex items-center gap-5 mt-2">
-                <KeyButton onClick={run.quit} className="w-16 h-16 !rounded-full" title="Quit (Esc)"><X size={22} /></KeyButton>
-                <KeyButton onClick={() => run.running ? run.pause() : run.resume()} variant="signal" className="w-24 h-24 !rounded-full" title="Space">
+                <KeyButton onClick={run.quit} className={cn('w-16 h-16 !rounded-full', keyFlash === 'quit' && 'key--pressed')} title="Quit (Esc)"><X size={22} /></KeyButton>
+                <KeyButton onClick={() => run.running ? run.pause() : run.resume()} variant="signal" className={cn('w-24 h-24 !rounded-full', keyFlash === 'toggle' && 'key--pressed')} title="Space">
                   {run.running ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" className="ml-1.5" />}
                 </KeyButton>
-                <KeyButton onClick={() => run.start(run.routine!)} className="w-16 h-16 !rounded-full" title="Restart"><RotateCcw size={22} /></KeyButton>
+                <KeyButton onClick={() => run.start(run.routine!)} className={cn('w-16 h-16 !rounded-full', keyFlash === 'restart' && 'key--pressed')} title="Restart"><RotateCcw size={22} /></KeyButton>
               </div>
             </div>
           </>
@@ -264,6 +266,7 @@ export default function IntervalsView() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06, type: 'spring', stiffness: 260, damping: 24 }}
+            whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
             className="panel-wall p-5 flex flex-col group relative"
           >
             {custom.some(c => c.id === r.id) && (
@@ -294,6 +297,8 @@ export default function IntervalsView() {
         {/* new routine card */}
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: all.length * 0.06 }}
+          whileHover={{ y: -3, transition: { type: 'spring', stiffness: 400, damping: 22 } }}
+          whileTap={{ scale: 0.97 }}
           onClick={() => setEditing(true)}
           className="flex flex-col items-center justify-center rounded-[10px] border-2 border-dashed border-rule p-6 min-h-[190px] hover:border-ink transition-colors group"
         >
