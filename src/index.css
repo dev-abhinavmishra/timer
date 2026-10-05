@@ -591,10 +591,16 @@ body {
 
 ::selection { background: var(--color-signal); color: #FFEDE3; }
 
+/* the app's own motion switch is authoritative — an OS-level reduce
+   only takes effect before settings apply (data-motion unset) or when
+   the user has actually picked Reduced; 'full' forces motion regardless */
 @media (prefers-reduced-motion: reduce) {
-  .flap--flipping .flap-leaf--top, .flap--flipping .flap-leaf--bot,
-  .board::before, .board-label, .view-fold-in { animation-duration: 1ms !important; animation-delay: 0ms !important; }
-  .flap-colon--live i { animation: none; }
+  html:not([data-motion="full"]) .flap--flipping .flap-leaf--top,
+  html:not([data-motion="full"]) .flap--flipping .flap-leaf--bot,
+  html:not([data-motion="full"]) .board::before,
+  html:not([data-motion="full"]) .board-label,
+  html:not([data-motion="full"]) .view-fold-in { animation-duration: 1ms !important; animation-delay: 0ms !important; }
+  html:not([data-motion="full"]) .flap-colon--live i { animation: none; }
 }
 html[data-motion="reduced"] .flap--flipping .flap-leaf--top,
 html[data-motion="reduced"] .flap--flipping .flap-leaf--bot { animation-duration: 1ms !important; animation-delay: 0ms !important; }

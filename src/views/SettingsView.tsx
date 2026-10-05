@@ -88,7 +88,7 @@ export default function SettingsView({ active = true }: { active?: boolean }) {
             {
               icon: <Gauge size={17} />,
               title: 'Full motion',
-              desc: 'Flap flips, cascades and ambient motion. Off for reduced motion.',
+              desc: 'Flap flips, cascades and ambient motion — overrides your OS reduce-motion. Off for reduced motion.',
               on: settings.motion === 'full',
               toggle: () => updateSettings({ motion: settings.motion === 'full' ? 'reduced' : 'full' }),
             },
