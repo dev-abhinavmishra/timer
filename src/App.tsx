@@ -72,7 +72,7 @@ export default function App() {
   };
 
   return (
-    <MotionConfig reducedMotion={settings.motion === 'reduced' ? 'always' : 'user'}>
+    <MotionConfig reducedMotion={settings.motion === 'reduced' ? 'always' : 'never'}>
     <div className="min-h-screen flex flex-col wall-tex text-ink font-body overflow-x-hidden">
       {!booted && <BootSequence onDone={() => setBooted(true)} />}
 
