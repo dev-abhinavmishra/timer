@@ -10,6 +10,7 @@ import { FlipRow, FlipText, Board } from '../components/Flip';
 import { RotaryDial } from '../components/RotaryDial';
 import { KeyButton } from '../components/KeyButton';
 import { stationChime, secondTick, flapLand } from '../lib/sound';
+import { parseSyllabusLink, syllabusReturnUrl } from '../lib/deeplink';
 
 const QUICK = [5, 10, 15, 25, 30, 45, 60, 90];
 
@@ -43,6 +44,7 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
   const [customMin, setCustomMin] = useState(25);
   const [done, setDone] = useState<null | 'focus' | 'break'>(null);
   const [keyFlash, setKeyFlash] = useState<string | null>(null);
+  const [syllabus, setSyllabus] = useState<{ block?: string; returnUrl?: string } | null>(null);
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const chainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,6 +68,32 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     cd.reset(presetMinutes * 60000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetMinutes, presetName]);
+
+  /* ---------- inbound Syllabus deep link (mounts once per preset key) ----------
+     ?intent&minutes&course&from=syllabus&block&return&autostart — boards the
+     block's context, strips the params, optionally departs immediately. */
+  useEffect(() => {
+    const link = parseSyllabusLink(window.location.search);
+    if (!link) return;
+    if (link.minutes) setSetMinutes(link.minutes);
+    if (link.intent) setIntent(link.intent);
+    if (link.course) setLabel(link.course);
+    setSyllabus({ block: link.block, returnUrl: link.returnUrl });
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url.toString());
+    const ms = (link.minutes ?? presetMinutes) * 60000;
+    cd.reset(ms);
+    if (link.autostart) cd.start(ms, completeFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fileBackToSyllabus = () => {
+    if (!syllabus) return;
+    const actual = Math.round((cd.totalMs - cd.remainingMs) / 60000);
+    const url = syllabusReturnUrl(syllabus, actual);
+    if (url) window.location.href = url;
+  };
 
   /* ---------- title bar ---------- */
   // a hidden running countdown must not stomp a takeover's title (e.g. the
@@ -598,6 +626,11 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
                 <KeyButton variant="signal" className="px-10 py-4 text-sm" onClick={() => { setDone(null); resetTimer(); }}>
                   Continue
                 </KeyButton>
+                {done === 'focus' && syllabus?.block && syllabus?.returnUrl && (
+                  <KeyButton className="px-10 py-4 text-sm" onClick={fileBackToSyllabus} title="Return to Syllabus and file this time">
+                    File back → Syllabus
+                  </KeyButton>
+                )}
               </motion.div>
             </motion.div>
 
