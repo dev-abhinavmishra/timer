@@ -59,8 +59,32 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
 
   useWakeLock(running || focus);
 
-  /* ---------- preset plumbing from Presets view ---------- */
+  /* ---------- preset plumbing + inbound Syllabus deep link ----------
+     The link is captured once per mount (TimerView remounts per preset key,
+     so a later Presets pick gets a fresh parse with the params already
+     stripped). It lives inside the plumbing effect so StrictMode's dev
+     double-invoke re-applies the link rather than stomping it back to the
+     preset — never clear pendingLink; this instance stays a link session. */
+  const pendingLink = useRef(parseSyllabusLink(window.location.search));
   useEffect(() => {
+    const link = pendingLink.current;
+    if (link) {
+      setSetMinutes(link.minutes ?? presetMinutes);
+      setLabel(link.course ?? presetName);
+      setIsBreak(false);
+      setDone(null);
+      if (link.intent) setIntent(link.intent);
+      setSyllabus({ block: link.block, returnUrl: link.returnUrl });
+      const url = new URL(window.location.href);
+      if (url.search) {
+        url.search = '';
+        window.history.replaceState({}, '', url.toString());
+      }
+      const ms = (link.minutes ?? presetMinutes) * 60000;
+      cd.reset(ms);
+      if (link.autostart) cd.start(ms, completeFocus);
+      return;
+    }
     setSetMinutes(presetMinutes);
     setLabel(presetName);
     setIsBreak(false);
@@ -68,25 +92,6 @@ export default function TimerView({ presetMinutes = 25, presetName, onFocusModeC
     cd.reset(presetMinutes * 60000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetMinutes, presetName]);
-
-  /* ---------- inbound Syllabus deep link (mounts once per preset key) ----------
-     ?intent&minutes&course&from=syllabus&block&return&autostart — boards the
-     block's context, strips the params, optionally departs immediately. */
-  useEffect(() => {
-    const link = parseSyllabusLink(window.location.search);
-    if (!link) return;
-    if (link.minutes) setSetMinutes(link.minutes);
-    if (link.intent) setIntent(link.intent);
-    if (link.course) setLabel(link.course);
-    setSyllabus({ block: link.block, returnUrl: link.returnUrl });
-    const url = new URL(window.location.href);
-    url.search = '';
-    window.history.replaceState({}, '', url.toString());
-    const ms = (link.minutes ?? presetMinutes) * 60000;
-    cd.reset(ms);
-    if (link.autostart) cd.start(ms, completeFocus);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const fileBackToSyllabus = () => {
     if (!syllabus) return;
